@@ -1,0 +1,5 @@
+# vendor:device|exact PCI device name
+1234:1111|QEMU/Bochs VGA (virtual)
+15ad:0405|VMware SVGA II (virtual)
+1b36:0100|QEMU QXL (virtual)
+1af4:1050|Virtio GPU (virtual)

@@ -1,0 +1,6 @@
+CustomMode          : bool: off
+KEK                 : blob: 2421 bytes
+PK                  : blob: 861 bytes
+SecureBootEnable    : bool: ON
+db                  : blob: 4004 bytes
+dbx                 : blob: 76 bytes

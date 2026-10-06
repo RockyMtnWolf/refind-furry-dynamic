@@ -3,3 +3,7 @@ test-esp/
 evidence/*.ppm
 evidence/*.o
 evidence/*.so
+vm-tests/
+evidence/phase2/*.ppm
+evidence/phase2/keygen.log
+*.key

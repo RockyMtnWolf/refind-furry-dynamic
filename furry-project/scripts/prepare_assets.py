@@ -17,4 +17,7 @@ for f in (theme/'icons').glob('*.png'):
     Image.open(f).convert('RGBA').save(f)
 s=(reference/'theme.conf').read_text().replace('30.png','45.png').replace('2560 1440','3840 2160').replace('big_icon_size 256','big_icon_size 384').replace('small_icon_size 96','small_icon_size 144')
 (theme/'theme.conf').write_text(s+'\ndynamic_info true\n',encoding='utf-8',newline='\n')
+database=theme/'gpu-names.txt'
+if not database.exists():
+    database.write_text('1234:1111|QEMU/Bochs VGA (virtual)\n15ad:0405|VMware SVGA II (virtual)\n1b36:0100|QEMU QXL (virtual)\n1af4:1050|Virtio GPU (virtual)\n',encoding='ascii')
 print('Prepared 3840x2160 banner and theme assets; no hardware strings baked in.')

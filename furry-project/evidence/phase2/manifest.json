@@ -1,0 +1,17 @@
+{
+  "source_commit": "4f0b5afcf0527ad462df238536b598b8892c335a",
+  "unsigned_efi_sha256": "0dfce9f52cfe5858a190c8bccd9f852ebad47d923760cf82587d2b08fe170547",
+  "signed_efi_sha256": "cb896c7fdc8fec1494cf9f99b886d9daca2a79f747055a715a2c5ae6173a320e",
+  "background_sha256": "49118c1fe3495c5e176d21676664b75dcfa123ead48a9f7841dd1e131969148f",
+  "final_screenshot": "final-4k.png",
+  "resolution": [
+    3840,
+    2160
+  ],
+  "ram_mib": 4096,
+  "real_os_screenshots": [
+    "ubuntu-uefi-proof.png",
+    "windows-uefi-proof.png"
+  ],
+  "github_pushed": false
+}

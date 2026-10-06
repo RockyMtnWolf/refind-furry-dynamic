@@ -1,0 +1,1 @@
+PASS: DIMMs, speed minimum, extended/KiB/unknown size, CPU fallback, checksum, malformed/truncated records

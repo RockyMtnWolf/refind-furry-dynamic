@@ -1,0 +1,21 @@
+[2J[01;01H[=3h[2J[01;01H[2J[01;01H[=3h[2J[01;01HBdsDxe: loading Boot0001 "UEFI QEMU NVMe Ctrl FINNTERM-LAB-0001 1" from PciRoot(0x0)/Pci(0x2,0x0)/NVMe(0x1,00-00-00-00-00-00-00-00)
+BdsDxe: starting Boot0001 "UEFI QEMU NVMe Ctrl FINNTERM-LAB-0001 1" from PciRoot(0x0)/Pci(0x2,0x0)/NVMe(0x1,00-00-00-00-00-00-00-00)
+[2J[01;01H[1m[37m[44m[01;01H                                                                                [02;01H                                                                                [03;01H                                                                                [02;04HrEFInd - Booting OS[0m[37m[40m[05;01HStarting demo.efi
+Using load options ''
+[1m[33m[40mSecure Boot validation failure loading demo.efi!
+[0m[37m[40m
+This computer is configured with Secure Boot active, but
+demo.efi has failed validation.
+
+You can:
+ * Launch another boot loader
+ * Disable Secure Boot in your firmware
+ * Sign demo.efi with a machine owner key (MOK)
+ * Use a MOK utility (often present on the second row) to add a MOK with which
+   demo.efi has already been signed.
+ * Use a MOK utility to register demo.efi ("enroll its hash") without
+   signing it.
+
+See http://www.rodsbooks.com/refind/secureboot.html for more information
+
+* Hit any key to continue *
