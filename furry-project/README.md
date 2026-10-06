@@ -43,6 +43,30 @@ cd "$env:USERPROFILE\Desktop\refind-furry-dynamic"
 
 需要重做资源时：`python scripts/prepare_assets.py`（需 Pillow）。然后重新构建。**不要运行原主题 `theme/src/gen.py`，它会重新生成写死数据的背景。**
 
+## Ubuntu 一键安装到实体机器
+
+将完整工程复制到 Ubuntu，进入工程目录运行：
+
+```bash
+sudo bash scripts/install-ubuntu.sh
+```
+
+对于源码归档包（顶层是 rEFInd 源码，包含 `furry-project/`），从解压后的顶层运行：
+
+```bash
+sudo bash furry-project/scripts/install-ubuntu.sh
+```
+
+脚本针对 **x86_64、以 UEFI 模式启动的 Ubuntu、已挂载的 GPT/FAT32 ESP**。自动安装构建依赖、完整构建这版动态 rEFInd、安装 4K 主题与生产配置，并将新启动项设为默认。配置扫描实际系统；发现同一 ESP 上的 Ubuntu/Windows 时加入明确入口，其他 ESP 仍由自动扫描发现。没有安装仿真的 demo 入口，也没有替换 `/EFI/BOOT` 回退入口。仅安装应用与主题，不安装额外文件系统 EFI 驱动，Ubuntu 使用其现有 shim/GRUB 链启动。
+
+安装目录为 ESP 的 `EFI/refind-furry/`。自动检查 `/boot/efi`、`/efi`、`/boot`；其他挂载点使用 `--esp /你的挂载点`。不会格式化分区。更新本脚本的安装时，旧目录、原 BootOrder 与固件条目记录备份至 `/var/lib/refind-furry/backups/`。需保留原默认启动顺序时加 `--no-activate`。
+
+Secure Boot 关闭时一次运行即可。开启时，首次在 `/var/lib/refind-furry/keys/` 生成本机专用证书，申请 MOK 注册并退出（返回码2），不安装新默认启动项。按提示设置临时密码，重启通过 Ubuntu shim 的 `Enroll MOK → Continue → Yes` 确认证书；回到 Ubuntu 后再运行同一命令，脚本使用 Ubuntu shim 与该证书签名的自定义 rEFInd 完成安装。此固件确认不能由脚本自动替代。不要复制仿真密钥来安装。保留此私钥以便后续更新，并限制其访问权限。
+
+安装完成会显示恢复原 BootOrder 的命令。也可在固件的一次性启动菜单选择原 Ubuntu/Windows。脚本不会自动重启。
+
+开发验证时可用 `--stage /tmp/refind-package --no-deps --binary /path/to/custom.efi` 只生成 unsigned EFI 安装包，不触及系统 ESP/NVRAM。脚本已验证语法、安装包文件/配置、重复打包与 WSL/非 root 拒绝路径；真实实体安装和 MOK 注册流程仍需目标机器验证。Secure Boot 流程参考 [rEFInd 官方说明](https://www.rodsbooks.com/refind/secureboot.html) 与 [Ubuntu Secure Boot 文档](https://documentation.ubuntu.com/security/security-features/platform-protections/secure-boot/)。
+
 ## 动态信息
 
 `dynamic_info true` 启用叠层；删除这一行或设置 `false` 后恢复普通 rEFInd 主题行为。

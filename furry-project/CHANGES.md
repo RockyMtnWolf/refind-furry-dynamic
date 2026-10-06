@@ -18,3 +18,9 @@
 - 增加专用签名环境、签名/未签名子程序对照、Ubuntu/Windows 实际介质准备、KVM/TCG 实验启动、VMware VMDK 模板、QMP 控制与截图。
 - EDK II DiskInfo/NvmExpressPassthru 协议头保留 BSD-2-Clause-Patent 版权，项目新增实现使用 GPL-3.0-or-later。
 - 保持 GitHub 推送前状态，不修改宿主启动项或密钥。
+
+## Ubuntu 安装器
+
+- `scripts/install-ubuntu.sh`：UEFI/Ubuntu/x86_64/ESP 检查、源码完整构建、独立 EFI 目录、生产系统扫描、原安装与 BootOrder 备份，支持更新和保留默认顺序。
+- Secure Boot 开启时使用本机专用 MOK + Ubuntu shim，注册前不切换默认启动项；一次重启确认后再运行完成安装。
+- 支持不读写系统 ESP/NVRAM 的 `--stage` 打包路径，用于验证安装配置和文件布局。
