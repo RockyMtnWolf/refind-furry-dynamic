@@ -133,6 +133,7 @@ UINTN egGetFontCellWidth(VOID);
 UINTN egComputeTextWidth(IN CHAR16 *Text);
 VOID egMeasureText(IN CHAR16 *Text, OUT UINTN *Width, OUT UINTN *Height);
 VOID egRenderText(IN CHAR16 *Text, IN OUT EG_IMAGE *CompImage, IN UINTN PosX, IN UINTN PosY, IN UINT8 BGBrightness);
+VOID egScaleFont(UINTN CellWidth, UINTN Height);
 VOID egLoadFont(IN CHAR16 *Filename);
 
 VOID egClearScreen(IN EG_PIXEL *Color);

@@ -1,0 +1,4 @@
+furry-project/scripts/*.sh text eol=lf
+furry-project/scripts/*.py text eol=lf
+furry-project/scripts/*.c text eol=lf
+*.png binary

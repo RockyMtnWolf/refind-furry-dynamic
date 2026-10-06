@@ -185,6 +185,18 @@ VOID SetupScreen(VOID)
        egGetScreenSize(&UGAWidth, &UGAHeight);
     } // if user requested a particular screen resolution
 
+    if (GlobalConfig.DynamicInfo && AllowGraphicsMode) {
+        UINTN scale = UGAWidth * 1000 / 3840, cell, height;
+        if (UGAHeight * 1000 / 2160 < scale) scale = UGAHeight * 1000 / 2160;
+        if (scale < 260) scale = 260;
+        if (scale > 1000) scale = 1000;
+        cell = 27 * scale / 1000; height = 54 * scale / 1000;
+        egScaleFont(cell, height);
+        GlobalConfig.IconSizes[ICON_SIZE_BIG] = 384 * scale / 1000;
+        GlobalConfig.IconSizes[ICON_SIZE_SMALL] = 144 * scale / 1000;
+        GlobalConfig.IconSizes[ICON_SIZE_BADGE] = GlobalConfig.IconSizes[ICON_SIZE_BIG] / 4;
+        HaveResized = TRUE;
+    }
     if (GlobalConfig.TextOnly) {
         LOG(2, LOG_LINE_NORMAL, L"Setting text-only mode");
         // switch to text mode if requested

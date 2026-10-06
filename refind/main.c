@@ -248,6 +248,9 @@ VOID RescanAll(BOOLEAN DisplayMessage, BOOLEAN Reconnect) {
         ScanVolumes();
     }
     ReadConfig(GlobalConfig.ConfigFilename);
+    // Config reload restores atlas/icon dimensions; reapply the dynamic layout.
+    if (GlobalConfig.DynamicInfo)
+        SetupScreen();
     SetVolumeIcons();
     ScanForBootloaders(DisplayMessage);
     ScanForTools();

@@ -5,6 +5,8 @@
 #include "screen.h"
 #include "libeg.h"
 #include "dynamic_info.h"
+#include "dynamic_devices.h"
+#include "log.h"
 #include "../include/refit_call_wrapper.h"
 
 static EFI_GUID Smbios2 = {0xeb9d2d31,0x2d88,0x11d3,{0x9a,0x16,0x00,0x90,0x27,0x3f,0xc1,0x4d}};
@@ -15,10 +17,15 @@ static UINT64 Read64(UINT8 *p) { UINT64 v; CopyMem(&v,p,8); return v; }
 static BOOLEAN Checksum(UINT8 *p, UINTN n) {
     UINT8 sum=0; UINTN i; for(i=0;i<n;i++) sum+=p[i]; return sum==0;
 }
+static UINT8 *SmbiosTable;
+static UINTN SmbiosLength;
+static CHAR16 MemoryDetail[100];
+
 /* Firmware owns these tables. Bound formatted records and string sets. */
 static UINT64 SmbiosMemory(VOID) {
     UINT8 *table=NULL,*ep,*p,*end,*next; UINTN i,len=0,count=0;
-    UINT64 total=0; UINT32 size;
+    UINT64 total=0; UINT32 size,speed=0,minSpeed=0; UINTN slots=0,filled=0; UINT8 memoryType=0;
+    SmbiosTable=NULL; SmbiosLength=0; MemoryDetail[0]=0;
     for(i=0;i<ST->NumberOfTableEntries;i++) {
         ep=ST->ConfigurationTable[i].VendorTable;
         if(CompareGuid(&ST->ConfigurationTable[i].VendorGuid,&Smbios3)==0 &&
@@ -32,6 +39,7 @@ static UINT64 SmbiosMemory(VOID) {
         }
     }
     if(!table || len<4 || len>32*1024*1024) return 0;
+    SmbiosTable=table; SmbiosLength=len;
     p=table; end=table+len;
     while(p+4<=end && count++<65536) {
         if(p[1]<4 || p[1]>(UINTN)(end-p)) return 0;
@@ -39,7 +47,16 @@ static UINT64 SmbiosMemory(VOID) {
         while(next+1<end && (next[0] || next[1])) next++;
         if(next+1>=end) return 0;
         if(p[0]==17 && p[1]>=14) {
-            size=Read16(p+12);
+            slots++; size=Read16(p+12);
+            if(size && size!=0xffff) {
+                filled++;
+                if(p[1]>18) { if(!memoryType) memoryType=p[18]; else if(memoryType!=p[18]) memoryType=255; }
+                if(p[1]>=34) speed=Read16(p+32);
+                else speed=0;
+                if(!speed && p[1]>=23) speed=Read16(p+21);
+                if(speed==65535) speed=p[1]>=92?Read32(p+88):0;
+                if(speed && (!minSpeed || speed<minSpeed)) minSpeed=speed;
+            }
             if(size==0xffff || (size==0x7fff && p[1]<32)) return 0;
             if(size==0x7fff && p[1]>=32) total+=(UINT64)(Read32(p+28)&0x7fffffff)*1024*1024;
             else if(size!=0 && size!=0xffff && size!=0x7fff)
@@ -48,7 +65,30 @@ static UINT64 SmbiosMemory(VOID) {
         if(p[0]==127) break;
         p=next+2;
     }
+    SPrint(MemoryDetail,sizeof(MemoryDetail),L"%s %d/%d DIMMs",memoryType==0x22?L"DDR5":memoryType==0x1a?L"DDR4":memoryType==0x18?L"DDR3":memoryType==255?L"mixed":L"RAM",filled,slots);
+    if(minSpeed) { CHAR16 suffix[24]; SPrint(suffix,sizeof(suffix),L" %d MT/s",minSpeed); StrCat(MemoryDetail,suffix); }
     return total;
+}
+static BOOLEAN SmbiosCpu(CHAR16 *out) {
+    UINT8 *p=SmbiosTable,*end,*next,*str; UINTN index,n,j;
+    if(!p) return FALSE;
+    end=p+SmbiosLength;
+    while(p+4<=end) {
+        if(p[1]<4 || p+p[1]>end) return FALSE;
+        next=p+p[1]; while(next+1<end && (next[0] || next[1])) next++;
+        if(next+1>=end) return FALSE;
+        if(p[0]==4 && p[1]>16 && (index=p[16])!=0) {
+            str=p+p[1]; n=1;
+            while(str<next && n<index) { while(str<next && *str) str++; str++; n++; }
+            if(n==index && str<next) {
+                for(j=0;j<48 && str+j<next && str[j];j++) out[j]=str[j]>=32 && str[j]<127?str[j]:'?';
+                out[j]=0; if(j) return TRUE;
+            }
+        }
+        if(p[0]==127) break;
+        p=next+2;
+    }
+    return FALSE;
 }
 /* Fallback measures firmware-mapped RAM, not installed DIMM capacity. */
 static UINT64 MappedMemory(VOID) {
@@ -63,7 +103,7 @@ static UINT64 MappedMemory(VOID) {
         if(!EFI_ERROR(status) && stride>=sizeof(EFI_MEMORY_DESCRIPTOR)) {
             for(i=0;i+stride<=bytes;i+=stride) {
                 d=(EFI_MEMORY_DESCRIPTOR *)((UINT8 *)map+i);
-                if(d->Type>=EfiLoaderCode && d->Type<=EfiACPIMemoryNVS)
+                if(d->Type>=EfiLoaderCode && d->Type<=EfiACPIMemoryNVS && d->Type!=EfiUnusableMemory)
                     total+=d->NumberOfPages*4096;
             }
             FreePool(map); return total;
@@ -87,14 +127,16 @@ static VOID CpuName(CHAR16 *out) {
         out[j]=0; if(j) return;
     }
 #endif
-    StrCpy(out,L"Unavailable (CPUID)");
+    if(!SmbiosCpu(out)) StrCpy(out,L"Unavailable (CPUID/SMBIOS)");
 }
-/* Provider extension points; never invent GPU or disk model strings. */
-static CONST CHAR16 *GpuInfo(VOID) { return L"pending PCI provider"; }
-static CONST CHAR16 *DiskInfo(VOID) { return L"pending Block I/O provider"; }
 static VOID Line(EG_IMAGE *frame, CHAR16 *text, UINTN x, UINTN y, BOOLEAN pink) {
-    EG_IMAGE *mask; EG_PIXEL clear={0,0,0,0}; UINTN i,w=egComputeTextWidth(text),h=egGetFontHeight();
+    CHAR16 safe[200]; UINTN copy; EG_IMAGE *mask; EG_PIXEL clear={0,0,0,0}; UINTN i,w=egComputeTextWidth(text),h=egGetFontHeight();
+    for(copy=0;copy<199 && text[copy];copy++) safe[copy]=text[copy];
+    safe[copy]=0; text=safe;
     if(x>=frame->Width || y>=frame->Height || y+h>frame->Height) return;
+    { UINTN maxWidth=frame->Width*62/100-x, cells=maxWidth/egGetFontCellWidth(),length=StrLen(text);
+      if(length>cells && cells>=4) { text[cells]=0; text[cells-1]='.'; text[cells-2]='.'; text[cells-3]='.'; w=egComputeTextWidth(text); }
+    }
     if(w>frame->Width-x) w=frame->Width-x;
     if(!w) return;
     mask=egCreateFilledImage(w,h,TRUE,&clear); if(!mask) return;
@@ -105,19 +147,21 @@ static VOID Line(EG_IMAGE *frame, CHAR16 *text, UINTN x, UINTN y, BOOLEAN pink) 
     egComposeImage(frame,mask,x,y); egFreeImage(mask);
 }
 VOID DrawDynamicInfo(VOID) {
-    EG_IMAGE *frame; CHAR16 cpu[64],buf[200],vendor[49];
+    EG_IMAGE *frame; CHAR16 cpu[64],buf[200],vendor[49],gpu[128],disk[128];
     EFI_GUID global=EFI_GLOBAL_VARIABLE; EFI_STATUS status; UINTN size=1,i;
     UINT8 secure=0; UINT64 memory; BOOLEAN smbios; UINTN x,y,step;
-    frame=egCopyScreen(); if(!frame) return;
+    frame=egCopyScreen(); if(!frame) { LOG(1, LOG_LINE_NORMAL, L"Dynamic info: screen copy allocation failed"); return; }
     x=frame->Width*35/1000; y=frame->Height*55/1000; step=egGetFontHeight()+frame->Height/90;
-    CpuName(cpu); memory=SmbiosMemory(); smbios=memory!=0; if(!memory) memory=MappedMemory();
+    memory=SmbiosMemory(); smbios=memory!=0; if(!memory) memory=MappedMemory(); CpuName(cpu);
+    DynamicGpu(gpu,sizeof(gpu)); DynamicDisk(disk,sizeof(disk));
+    LOG(2, LOG_LINE_NORMAL, L"Dynamic info: CPU '%s', RAM %ld MiB, GPU '%s', disk '%s'",cpu,memory/(1024*1024),gpu,disk);
     for(i=0; i<48 && ST->FirmwareVendor && ST->FirmwareVendor[i]; i++)
         vendor[i]=ST->FirmwareVendor[i]>=32 && ST->FirmwareVendor[i]<127?ST->FirmwareVendor[i]:'?';
     vendor[i]=0;
     Line(frame,L"furry // firmware boot sequence",x,y,TRUE); y+=step;
     Line(frame,L"--------------------------------------------------------------",x,y,FALSE); y+=step;
     SPrint(buf,sizeof(buf),L"> cpu     :: %s",cpu); Line(frame,buf,x,y,FALSE); y+=step;
-    if(memory) SPrint(buf,sizeof(buf),L"> memory  :: %ld MiB [%s]",memory/(1024*1024),smbios?L"SMBIOS":L"EFI mapped RAM");
+    if(memory) SPrint(buf,sizeof(buf),L"> memory  :: %ld MiB [%s]",memory/(1024*1024),smbios?MemoryDetail:L"EFI mapped RAM");
     else StrCpy(buf,L"> memory  :: unavailable");
     Line(frame,buf,x,y,FALSE); y+=step;
     SPrint(buf,sizeof(buf),L"> firmware:: %s / rev 0x%x",vendor,ST->FirmwareRevision); Line(frame,buf,x,y,FALSE); y+=step;
@@ -125,8 +169,8 @@ VOID DrawDynamicInfo(VOID) {
     status=refit_call5_wrapper(RT->GetVariable,L"SecureBoot",&global,NULL,&size,&secure);
     SPrint(buf,sizeof(buf),L"> secure  :: %s",EFI_ERROR(status)?L"UNKNOWN (variable unavailable)":secure?L"ON":L"OFF");
     Line(frame,buf,x,y,TRUE); y+=step;
-    SPrint(buf,sizeof(buf),L"> gpu     :: %s",GpuInfo()); Line(frame,buf,x,y,FALSE); y+=step;
-    SPrint(buf,sizeof(buf),L"> disk    :: %s",DiskInfo()); Line(frame,buf,x,y,FALSE); y+=step;
+    SPrint(buf,sizeof(buf),L"> gpu     :: %s",gpu); Line(frame,buf,x,y,FALSE); y+=step;
+    SPrint(buf,sizeof(buf),L"> disk    :: %s",disk); Line(frame,buf,x,y,FALSE); y+=step;
     Line(frame,L"> awaiting boot target ...",x,y,TRUE);
     egDrawImage(frame,0,0); egFreeImage(frame);
 }

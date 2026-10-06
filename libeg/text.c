@@ -153,6 +153,8 @@ VOID egRenderText(IN CHAR16 *Text, IN OUT EG_IMAGE *CompImage, IN UINTN PosX, IN
 
 // Load a font bitmap from the specified file
 VOID egLoadFont(IN CHAR16 *Filename) {
+   egFreeImage(DarkFontImage); egFreeImage(LightFontImage);
+   DarkFontImage = NULL; LightFontImage = NULL;
    if (BaseFontImage)
       egFreeImage(BaseFontImage);
 
@@ -163,3 +165,16 @@ VOID egLoadFont(IN CHAR16 *Filename) {
 } // BOOLEAN egLoadFont()
 
 /* EOF */
+
+// Resize an atlas after GOP mode selection; discard both derived color caches.
+VOID egScaleFont(UINTN CellWidth, UINTN Height) {
+    EG_IMAGE *scaled;
+    egPrepareFont();
+    if (!BaseFontImage || CellWidth < 5 || Height < 8 || CellWidth > 64 || Height > 128) return;
+    if (BaseFontImage->Width == CellWidth * FONT_NUM_CHARS && BaseFontImage->Height == Height) return;
+    scaled = egScaleImage(BaseFontImage, CellWidth * FONT_NUM_CHARS, Height);
+    if (!scaled) return;
+    egFreeImage(BaseFontImage); egFreeImage(DarkFontImage); egFreeImage(LightFontImage);
+    BaseFontImage = scaled; DarkFontImage = NULL; LightFontImage = NULL;
+    FontCellWidth = CellWidth;
+}
