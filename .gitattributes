@@ -2,3 +2,5 @@ furry-project/scripts/*.sh text eol=lf
 furry-project/scripts/*.py text eol=lf
 furry-project/scripts/*.c text eol=lf
 *.png binary
+# Raw serial streams contain ANSI escapes and deliberate CR/cursor movement.
+furry-project/evidence/phase2/*.log binary
