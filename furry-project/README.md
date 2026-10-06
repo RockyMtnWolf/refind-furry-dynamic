@@ -8,7 +8,7 @@
 
 - `refind/`：保留完整上游 Git 历史的独立源码仓库；改动见 `refind/refind/dynamic_info.c`。
 - `theme-reference/`：聊天提供的 finn-term ZIP 解包副本，保留原始资源和许可证。
-- `assets/furry-source.png`：桌面已有“霓虹狼影与紫色月环”背景副本。输入大图为 6688×3764，已整理并保存为 3840×2160，不宣称模型原生输出 4K。
+- `assets/furry-source.png`：桌面已有“霓虹狼影与紫色月环”大图副本，6688×3764；运行时整理为 3840×2160，不宣称模型原生输出 4K。
 - `theme/`：运行时 finn-term 主题资源，背景没有硬件数据。
 - `scripts/`：依赖安装、资源准备、构建、启动、QMP 截图与控制。
 - `test-esp/`：仅用于仿真的 FAT 目录，包含 `EFI/BOOT/BOOTX64.EFI`、配置与演示 EFI。

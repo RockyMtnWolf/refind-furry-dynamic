@@ -130,4 +130,3 @@ VOID DrawDynamicInfo(VOID) {
     Line(frame,L"> awaiting boot target ...",x,y,TRUE);
     egDrawImage(frame,0,0); egFreeImage(frame);
 }
-

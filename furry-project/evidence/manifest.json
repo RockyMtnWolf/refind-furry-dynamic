@@ -1,0 +1,5 @@
+{
+  "theme/background.png": "49118c1fe3495c5e176d21676664b75dcfa123ead48a9f7841dd1e131969148f",
+  "test-esp/EFI/BOOT/BOOTX64.EFI": "e181522e70cce9074a210765cf841c65f0dc81dd14e65c613b2c3124ea94b035",
+  "firmware/OVMF_CODE_4M.secboot.fd": "1286f2a3217d09b374d05951355d7a561c8bacecd74845c8a1fbb71a48c0de8d"
+}
