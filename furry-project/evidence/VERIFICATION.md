@@ -20,3 +20,6 @@
 截图：`qemu-2048-4k.png`、`qemu-4096-4k.png`、`demo-loader.png`、`menu-return.png`。最终源码和二进制对应关系由 binary.sha256 记录。
 
 不涵盖：实体机器；Secure Boot ON 的实际签名链；真实 Windows/Linux 操作系统启动；GPU/磁盘 provider；EFI memory map 回退在该 OVMF 配置下未触发。当前 Windows/Ubuntu 入口只启动 demo EFI。
+
+最终 PowerShell build.ps1 完整重建通过，run.ps1 -Window -MemoryMiB 4096 实际开启 WSLg GTK 窗口；capture.ps1 通过 QMP 切换到 Windows demo 图标，动态叠层保持显示，见 qemu-window.png。CPU/内存对照图使用同一个早期构建（二进制 hash 见 manifest 的 comparison_binary_sha256）；最终构建另记录在 binary.sha256。
+本机没有 Git 用户身份配置；本地提交使用独立的 Codex <codex@localhost> 署名，不修改用户全局 Git 配置。
