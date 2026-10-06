@@ -1,0 +1,5 @@
+firmware/
+test-esp/
+evidence/*.ppm
+evidence/*.o
+evidence/*.so

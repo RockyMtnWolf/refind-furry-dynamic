@@ -719,6 +719,9 @@ VOID ReadConfig(CHAR16 *FileName)
         } else if (MyStriCmp(TokenList[0], L"banner")) {
             HandleString(TokenList, TokenCount, &(GlobalConfig.BannerFileName));
 
+        } else if (MyStriCmp(TokenList[0], L"dynamic_info")) {
+            GlobalConfig.DynamicInfo = HandleBoolean(TokenList, TokenCount);
+
         } else if (MyStriCmp(TokenList[0], L"banner_scale") && (TokenCount == 2)) {
             if (MyStriCmp(TokenList[1], L"noscale")) {
                 GlobalConfig.BannerScale = BANNER_NOSCALE;

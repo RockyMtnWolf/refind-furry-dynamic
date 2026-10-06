@@ -365,6 +365,7 @@ typedef struct {
    UINTN            MouseSpeed;
    UINTN            IconSizes[4];
    UINTN            BannerScale;
+   BOOLEAN          DynamicInfo;
    UINTN            LogLevel;
    REFIT_VOLUME     *DiscoveredRoot;
    EFI_DEVICE_PATH  *SelfDevicePath;

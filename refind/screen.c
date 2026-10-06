@@ -57,6 +57,7 @@
 
 #include "global.h"
 #include "screen.h"
+#include "dynamic_info.h"
 #include "config.h"
 #include "libegint.h"
 #include "lib.h"
@@ -485,6 +486,8 @@ VOID BltClearScreen(BOOLEAN ShowBanner)
         egClearScreen(&MenuBackgroundPixel);
     }
 
+    if (ShowBanner && GlobalConfig.DynamicInfo && GlobalConfig.ScreensaverTime != -1)
+        DrawDynamicInfo();
     GraphicsScreenDirty = FALSE;
     egFreeImage(GlobalConfig.ScreenBackground);
     GlobalConfig.ScreenBackground = egCopyScreen();
