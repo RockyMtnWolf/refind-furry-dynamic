@@ -124,7 +124,8 @@ else
 fi
 cat >"$PAYLOAD/refind.conf" <<'CONF'
 # Production installation: scan real EFI OS loaders, no QEMU demo entries.
-timeout 10
+timeout 5
+default_selection "Windows,Microsoft"
 scanfor internal,external,optical,manual
 scan_all_linux_kernels false
 dont_scan_dirs +,EFI/refind-furry

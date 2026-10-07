@@ -9,7 +9,8 @@ cp -r "$ROOT/theme/." "$STAGE/EFI/BOOT/themes/finn-term/"
 sbsign --key "$LAB/keys/test.key" --cert "$LAB/keys/test.crt" \
  --output "$STAGE/EFI/BOOT/BOOTX64.EFI" "$ROOT/test-esp/EFI/BOOT/BOOTX64.EFI"
 cat > "$STAGE/EFI/BOOT/refind.conf" <<'CONF'
-timeout 0
+timeout 5
+default_selection "Windows,Microsoft"
 scanfor manual
 showtools reboot shutdown about firmware
 hideui hints,arrows,badges

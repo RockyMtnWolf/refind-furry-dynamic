@@ -30,3 +30,9 @@
 - 原简化 VMX 缺少 PCIe 桥，NVMe 控制器无法分配插槽；模板与现有测试 VM 补齐 pciBridge0、pciBridge4–7/pcieRootPort。
 - 准备脚本同时生成 VMX，独立 ESP 请求 VMware 实际支持的1920×1080 GOP；保留4K背景及动态布局缩放。
 - 通过 localhost VNC 抓取实际固件菜单，VMware 基础启动与 GPU/NVMe 信息读取实测通过。
+
+## 默认 Windows 与5秒倒计时
+
+- 测试 ESP、Ubuntu 生产安装器和 Windows 实际介质配置统一使用 `timeout 5` 与 `default_selection "Windows,Microsoft"`。
+- 使用 rEFInd 原生菜单倒计时；Windows 名称优先，Microsoft 名称作为自动扫描入口的备用匹配。任意键取消倒计时，Windows 缺失时回退首项。
+- 安装器打包回归检查倒计时和默认选择；VMware 实际截图确认5秒显示、Windows 高亮与无输入自动跳转（测试入口是 demo EFI）。

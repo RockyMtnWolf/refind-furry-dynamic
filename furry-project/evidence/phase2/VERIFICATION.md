@@ -92,3 +92,12 @@ VMware Workstation 25.0.0 build-24995812，虚拟硬件21、EFI、4 GiB RAM、2 
 `vmware-menu.png` 是实际 VNC framebuffer：Firmware VMware, Inc.、Secure OFF、GPU VMware SVGA II `[15ad:0405]`、磁盘 VMware Virtual NVMe Disk / 512 MiB / NVMe。内存4096 MiB，VMware SMBIOS报告1/128逻辑槽位、4800 MT/s，不代表实体机器 DIMM 插槽数。CPU为传递的 i9-13905H 品牌字符串。
 
 授权服务当前可用，之前权限阻塞记录已解决。VIX captureScreen 需要 guest 登录，改用专用 localhost VNC 截图，不依赖 guest OS 或 VMware Tools。没有因此声称 VMware Secure Boot/MOK 或完整 Windows 系统启动已通过。
+
+## Windows 默认项与倒计时补测（2026-10-07）
+
+使用未改动 EFI 二进制，测试配置 `timeout 5`、`default_selection "Windows,Microsoft"`。VMware 冷启动过程中仅请求 VNC framebuffer，没有发送键盘或鼠标输入。
+
+- `vmware-windows-countdown-5s.png`：Windows 默认高亮，原生菜单文字 `Automatic boot in 5 seconds`。
+- `vmware-windows-countdown-2s.png`：Windows 保持选中，倒计时到2秒。
+- `vmware-windows-timeout-loader.png`：倒计时结束自动进入 demo EFI。这里证明默认入口与超时跳转，不表示已经启动完整 Windows；真实安装配置扫描 Windows/Microsoft loader。
+- Ubuntu 安装器 `test-install-ubuntu.sh` 两次打包检查均通过，包含timeout/default_selection精确检查以及实际文件布局、二进制/背景一致性与非法PE拒绝。

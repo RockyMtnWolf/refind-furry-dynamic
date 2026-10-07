@@ -57,7 +57,7 @@ sudo bash scripts/install-ubuntu.sh
 sudo bash furry-project/scripts/install-ubuntu.sh
 ```
 
-脚本针对 **x86_64、以 UEFI 模式启动的 Ubuntu、已挂载的 GPT/FAT32 ESP**。自动安装构建依赖、完整构建这版动态 rEFInd、安装 4K 主题与生产配置，并将新启动项设为默认。配置扫描实际系统；发现同一 ESP 上的 Ubuntu/Windows 时加入明确入口，其他 ESP 仍由自动扫描发现。没有安装仿真的 demo 入口，也没有替换 `/EFI/BOOT` 回退入口。仅安装应用与主题，不安装额外文件系统 EFI 驱动，Ubuntu 使用其现有 shim/GRUB 链启动。
+脚本针对 **x86_64、以 UEFI 模式启动的 Ubuntu、已挂载的 GPT/FAT32 ESP**。自动安装构建依赖、完整构建这版动态 rEFInd、安装 4K 主题与生产配置，并将新启动项设为默认。配置默认5秒后启动 Windows（按 Windows/Microsoft 名称匹配），按任意键取消倒计时。配置扫描实际系统；发现同一 ESP 上的 Ubuntu/Windows 时加入明确入口，其他 ESP 仍由自动扫描发现。没有安装仿真的 demo 入口，也没有替换 `/EFI/BOOT` 回退入口。仅安装应用与主题，不安装额外文件系统 EFI 驱动，Ubuntu 使用其现有 shim/GRUB 链启动。
 
 安装目录为 ESP 的 `EFI/refind-furry/`。自动检查 `/boot/efi`、`/efi`、`/boot`；其他挂载点使用 `--esp /你的挂载点`。不会格式化分区。更新本脚本的安装时，旧目录、原 BootOrder 与固件条目记录备份至 `/var/lib/refind-furry/backups/`。需保留原默认启动顺序时加 `--no-activate`。
 
@@ -80,6 +80,8 @@ Secure Boot 关闭时一次运行即可。开启时，首次在 `/var/lib/refind
 - 磁盘：Block I/O 枚举整盘，优先当前引导盘；通过 Device Path 判断 NVMe/SATA/USB/SCSI。Disk Info 或只读 NVMe Identify Controller 获取型号，容量来自 Block I/O；不支持的固件明确显示 model unavailable。GB 使用十进制，MiB 使用二进制。
 
 叠层在背景绘制后、ScreenBackground 缓存前生成，因此菜单局部重绘与返回不会抹掉信息。字体和选择框保留 finn-term 紫粉配色。原字体是彩色 atlas；已适配 rEFInd 的暗背景反色规则。
+
+启动策略为 `timeout 5`、`default_selection "Windows,Microsoft"`：菜单默认选中 Windows，显示5秒倒计时后自动启动；按任意键取消倒计时，可手动选择 Ubuntu。未找到 Windows 时回退到第一个可启动菜单项。需要长时间停留菜单截图时，可临时将测试配置的 `timeout` 改成0并重新生成测试盘。
 
 默认 ESP 的 Windows、Ubuntu 是标注的 demo EFI 菜单入口，用来验证图标/选择/启动/返回。系统测试使用独立 `vm-tests/` 介质与实际 loader 配置，见下面的实验说明。背景、字体、图标按实际 GOP 分辨率缩放，信息最长占屏幕左侧 62%，超长文本加省略号。
 
