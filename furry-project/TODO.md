@@ -1,14 +1,43 @@
-# 后续 TODO
+# Roadmap and Validation Checklist
 
-- [x] PCI Display Controller/GOP 枚举、真实 ID、精确匹配的可更新 GPU 名称映射。
-- [x] Block I/O + Device Path + Disk Info/NVMe Identify 获取型号、容量、连接类型；未知协议/型号明确标记 unavailable。
-- [x] CPU CPUID 空值时 SMBIOS Type 4 备用读取；宿主解析器回归已通过。
-- [x] SMBIOS 内存类型、插槽、配置速度、扩展/KiB/未知容量；多 DIMM、校验和与截断数据回归已通过 ASan/UBSan。
-- [x] 720p/1080p/4K 字体与图标适配，长行省略；修复重新扫描后的字体缓存与尺寸恢复。
-- [x] 仿真 Secure Boot ON 签名链与未签名子程序拒绝对照。
-- [x] 真正 Linux/Windows EFI 引导测试；独立测试 ESP 使用实际 shim/boot manager 路径。Ubuntu Live 登录后确认 UEFI/SecureBoot enabled；WinPE 确认 PEFirmwareType=2。
-- [ ] 在实体硬件上验证 GOP、CPUID、SMBIOS 与 Secure Boot 变量；不以虚拟机结果代替实机证据。
-- [x] VMware 第二平台基础验证：2026-10-07 授权服务可用，补齐 PCIe 桥后 NVMe 启动成功；1080p菜单正确读取 VMware 固件、GPU 与 NVMe。
-- [ ] VMware 内 Ubuntu/MOK Secure Boot 与第二块 Windows 系统盘完整启动。
-- [ ] Hyper-V 第二平台验证：vmms 已运行，但 Get-VM 实测被当前账户权限拒绝，尚未创建或修改 Hyper-V VM。
-- [ ] 发布到用户 GitHub：用户本次要求停在 push 之前，保留 upstream 与 furry-dynamic 本地分支。发布步骤见 README。
+## Implemented and Verified
+
+- [x] Live CPU information from CPUID, with SMBIOS Type 4 fallback.
+- [x] SMBIOS Type 17 memory capacity/type/speed/slots and EFI memory-map fallback.
+- [x] Firmware vendor/revision, UEFI version, and Secure Boot ON/OFF/UNKNOWN.
+- [x] PCI Display Controller/GOP enumeration and exact GPU vendor/device mapping.
+- [x] Disk model, capacity, and transport through Block I/O, Device Path, Disk Info, and read-only NVMe Identify.
+- [x] Adaptive 720p/1080p/4K theme, text truncation, and font-cache behavior after rescanning.
+- [x] ASan/UBSan tests of the production SMBIOS parser, including malformed records and fallback cases.
+- [x] QEMU/OVMF menu validation and isolated Secure Boot signed/unsigned child comparison.
+- [x] Actual Ubuntu Live boot with UEFI runtime and SecureBoot enabled.
+- [x] Actual Microsoft EFI boot manager to Windows WinPE; PEFirmwareType equals 2.
+- [x] VMware basic menu, NVMe startup, firmware/GPU/disk information, and 1080p layout.
+- [x] Windows default selection, visible five-second countdown, and automatic demo EFI launch in VMware.
+- [x] Ubuntu installer package staging, repeatability, configuration, and invalid EFI rejection.
+
+## Physical-Machine Validation — TODO
+
+- [ ] Firmware GOP modes and scaling across target monitors.
+- [ ] Real CPUID/SMBIOS values, DIMM capacity/type/speed, GPU PCI IDs, and NVMe/SATA model reporting.
+- [ ] Ubuntu installation with Secure Boot disabled.
+- [ ] Ubuntu MOK enrollment and signed rEFInd installation with Secure Boot enabled.
+- [ ] Installation updates using the existing signing key and recovery of the original BootOrder.
+- [ ] Second Windows system disk discovery across its own ESP.
+- [ ] Complete Windows desktop boot with Secure Boot enabled, including the five-second default selection.
+- [ ] Complete Ubuntu boot and return/rescan behavior on physical firmware.
+
+Use [HARDWARE-TEST.md](HARDWARE-TEST.md) for the detailed physical-machine checklist.
+
+## Additional VM Coverage — TODO
+
+- [ ] VMware Ubuntu MOK enrollment and full dual-system-disk OS startup.
+- [ ] Hyper-V validation with an account authorized to manage virtual machines.
+- [ ] Completed Windows installation and desktop startup; current Windows evidence covers WinPE only.
+
+## Publication
+
+- [x] English README with actual screenshots and explicit validation scope.
+- [x] Public GitHub repository with the furry-dynamic development branch.
+
+Detailed test evidence: [Phase 1](evidence/VERIFICATION.md) and [Phase 2](evidence/phase2/VERIFICATION.md).
