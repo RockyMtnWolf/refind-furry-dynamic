@@ -8,6 +8,7 @@
 - [x] 仿真 Secure Boot ON 签名链与未签名子程序拒绝对照。
 - [x] 真正 Linux/Windows EFI 引导测试；独立测试 ESP 使用实际 shim/boot manager 路径。Ubuntu Live 登录后确认 UEFI/SecureBoot enabled；WinPE 确认 PEFirmwareType=2。
 - [ ] 在实体硬件上验证 GOP、CPUID、SMBIOS 与 Secure Boot 变量；不以虚拟机结果代替实机证据。
-- [ ] VMware 第二平台验证：本机授权服务停止，当前会话启动服务被权限拒绝；专用 VMX/VMDK 准备脚本已留存。
+- [x] VMware 第二平台基础验证：2026-10-07 授权服务可用，补齐 PCIe 桥后 NVMe 启动成功；1080p菜单正确读取 VMware 固件、GPU 与 NVMe。
+- [ ] VMware 内 Ubuntu/MOK Secure Boot 与第二块 Windows 系统盘完整启动。
 - [ ] Hyper-V 第二平台验证：vmms 已运行，但 Get-VM 实测被当前账户权限拒绝，尚未创建或修改 Hyper-V VM。
 - [ ] 发布到用户 GitHub：用户本次要求停在 push 之前，保留 upstream 与 furry-dynamic 本地分支。发布步骤见 README。

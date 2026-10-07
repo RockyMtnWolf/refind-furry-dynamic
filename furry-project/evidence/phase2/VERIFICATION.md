@@ -78,7 +78,17 @@ SMBIOS_FILE="$PWD/vm-tests/fixtures/unknown-memory.bin" bash scripts/run-lab.sh
 ## 尚未验证
 
 - 实体硬件 GOP、GPU/NVMe 型号与 SMBIOS 差异，按 `HARDWARE-TEST.md` 另行测试。
-- VMware 第二平台：VMAuthdService 当前停止，当前会话启动服务被权限拒绝；准备了专用 VMX/VMDK，没有通过截图。
+- VMware 内 Ubuntu/MOK 的 Secure Boot 链及第二块 Windows 系统盘完整启动尚未验证；基础菜单结果见下方补测。
 - Hyper-V：vmms 运行，但 Get-VM 返回授权策略权限错误；当前进程不在 Administrator 角色，没有修改现有 VM。
 - 不声称已安装 Ubuntu/Windows 到硬盘或验证了完整系统功能。
 - 没有添加 GitHub origin、在线 fork 或 push；本次要求停在远程推送之前。
+
+## VMware 补测（2026-10-07）
+
+用户手动启动暴露 `No PCIe slot available for nvme0`。原简化 VMX 没有 PCIe root port；补齐 pciBridge0 与 pciBridge4–7 后，vmrun start 成功。
+
+VMware Workstation 25.0.0 build-24995812，虚拟硬件21、EFI、4 GiB RAM、2 vCPU，512 MiB NVMe GPT/FAT32测试盘。当前固件提供1920×1080 GOP但没有3840×2160；专用主题配置改为1080p，背景仍为4K。
+
+`vmware-menu.png` 是实际 VNC framebuffer：Firmware VMware, Inc.、Secure OFF、GPU VMware SVGA II `[15ad:0405]`、磁盘 VMware Virtual NVMe Disk / 512 MiB / NVMe。内存4096 MiB，VMware SMBIOS报告1/128逻辑槽位、4800 MT/s，不代表实体机器 DIMM 插槽数。CPU为传递的 i9-13905H 品牌字符串。
+
+授权服务当前可用，之前权限阻塞记录已解决。VIX captureScreen 需要 guest 登录，改用专用 localhost VNC 截图，不依赖 guest OS 或 VMware Tools。没有因此声称 VMware Secure Boot/MOK 或完整 Windows 系统启动已通过。

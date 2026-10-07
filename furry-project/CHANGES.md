@@ -24,3 +24,9 @@
 - `scripts/install-ubuntu.sh`：UEFI/Ubuntu/x86_64/ESP 检查、源码完整构建、独立 EFI 目录、生产系统扫描、原安装与 BootOrder 备份，支持更新和保留默认顺序。
 - Secure Boot 开启时使用本机专用 MOK + Ubuntu shim，注册前不切换默认启动项；一次重启确认后再运行完成安装。
 - 支持不读写系统 ESP/NVRAM 的 `--stage` 打包路径，用于验证安装配置和文件布局。
+
+## VMware 配置修复
+
+- 原简化 VMX 缺少 PCIe 桥，NVMe 控制器无法分配插槽；模板与现有测试 VM 补齐 pciBridge0、pciBridge4–7/pcieRootPort。
+- 准备脚本同时生成 VMX，独立 ESP 请求 VMware 实际支持的1920×1080 GOP；保留4K背景及动态布局缩放。
+- 通过 localhost VNC 抓取实际固件菜单，VMware 基础启动与 GPU/NVMe 信息读取实测通过。

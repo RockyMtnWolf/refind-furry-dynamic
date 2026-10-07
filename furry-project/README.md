@@ -112,7 +112,9 @@ Windows：用 root 执行 `prepare-windows-media.sh`（自动只读挂载 Downlo
 
 SMBIOS 回归场景由 `make-smbios-fixtures.py` 生成**合成固件数据**，不是本机硬件规格。Linux 环境变量 `SMBIOS_FILE`、`SMBIOS_CPU`、`CPU` 与 `DISK_BUS=sata` 可验证多 DIMM、CPU 备用读取、EFI memory map 退回与 SATA 型号。命令及观察值记录在 `evidence/phase2/VERIFICATION.md`。
 
-VMware：`prepare-vmware.sh` 生成独立 VMDK；模板位于 `scripts/vmware-test.vmx`，复制到 `vm-tests/vmware/refind-test.vmx` 即可用 vmrun 启动和 captureScreen。当前机器 VMware Authorization Service 停止，当前会话启动服务无权限，故没有 VMware 通过证据；QEMU 实验正常运行。
+VMware：先关闭专用测试 VM，再运行 `prepare-vmware.sh`，生成独立 VMDK 与 `vm-tests/vmware/refind-test.vmx`。模板补齐 PCIe 根端口供 NVMe 控制器分配插槽。2026-10-07 本机授权服务已运行，实际进入1920×1080菜单；4K背景保留，字体/图标按实际 GOP 缩放。该 VMware 固件没有暴露3840×2160模式，专用 ESP 配置采用1080p以避免模式选择提示。
+
+实际截图见 `evidence/phase2/vmware-menu.png`，Secure Boot OFF，正确读取 VMware GPU PCI ID、NVMe 型号和容量。`capture-vmware.py` 用 Pillow 与 localhost:5911 的专用 VNC 捕获固件画面，不需要 guest OS/VMware Tools；`vmrun captureScreen` 在本机要求 guest 登录，无法用于 EFI 菜单。VMware 内 Secure Boot/MOK 和双系统盘完整启动仍待验证。
 
 Hyper-V 的 vmms 已运行，但本次 `Get-VM` 实测返回授权策略权限错误，未创建或修改现有 Hyper-V VM。第二平台结果保留为待验证。
 
