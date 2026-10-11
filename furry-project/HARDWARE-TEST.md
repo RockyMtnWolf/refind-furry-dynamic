@@ -11,4 +11,4 @@
 
 可临时在配置中加入 `log_level 2`，在同一 ESP 收集 rEFInd 日志。测试完成移除日志配置。无法进入菜单时用 `dynamic_info false` 对比上游 UI，记录固件、分辨率、PCI 控制器和 Secure Boot 状态，以便排查。
 
-本轮已执行真实 ESP 安装/更新，用户已多次重启验证；原 Ubuntu 和备用 EFI 文件校验保持完整。实机 Windows 桌面启动、Secure Boot 关闭、其他显示器及实际备份恢复仍未验证，参见 TODO.md。
+本轮已执行真实 ESP 安装/更新，用户已多次重启验证；原 Ubuntu 和备用 EFI 文件校验保持完整。当前仅保留 Windows 实机测试为待办：独立 Windows 系统盘/ESP 发现、5 秒默认倒计时启动与 Secure Boot 下进入完整桌面。Secure Boot 关闭、其他显示器及实际备份恢复不属于当前待办范围，也不标记为已验证。参见 TODO.md。

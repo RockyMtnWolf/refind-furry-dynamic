@@ -24,21 +24,11 @@
 - [x] Signed updates with the existing key, EFI/BootOrder backups, original Ubuntu/fallback files preserved and recovery entry available.
 - [x] Repeated Ubuntu boot, normal menu refresh and working About submenu on current firmware.
 
-## Remaining Physical Coverage
+## Remaining Validation — Windows Physical Machine
 
-- [ ] Secure Boot disabled.
-- [ ] Other monitors/firmware and loader-return/rescan scenarios.
-- [ ] Second Windows system disk discovery and full Windows desktop boot with Secure Boot enabled.
-- [ ] Bare-metal five-second automatic boot after the final configuration change.
-- [ ] Actual restoration from backup (backup integrity and the recovery entry are verified).
+- [ ] Discover the Windows system disk and its EFI System Partition, select Windows by default, and reach the full Windows desktop after the five-second countdown with Secure Boot enabled.
 
-Use [HARDWARE-TEST.md](HARDWARE-TEST.md) for the detailed physical-machine checklist.
-
-## Additional VM Coverage — TODO
-
-- [ ] VMware Ubuntu MOK enrollment and full dual-system-disk OS startup.
-- [ ] Hyper-V validation with an account authorized to manage virtual machines.
-- [ ] Completed Windows installation and desktop startup; current Windows evidence covers WinPE only.
+Use [HARDWARE-TEST.md](HARDWARE-TEST.md) for the physical-machine procedure. This is the only remaining planned validation task. VMware Ubuntu MOK / full dual-disk boot and Hyper-V are outside the current validation scope. Other firmware/monitors, Secure Boot-off behavior and an actual backup restoration are not claimed as tested and are not remaining TODO items.
 
 ## Publication
 

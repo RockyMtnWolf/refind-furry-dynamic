@@ -87,9 +87,7 @@ Set `dynamic_info true` in the theme configuration to enable the overlay. Set it
 | Windows default + five-second timeout | ✅ Passed | VMware captures of selected Windows demo entry, countdown, automatic launch |
 | Ubuntu installer package regression | ✅ Passed | Repeated staging, exact files/configuration, invalid EFI rejection |
 | Physical hardware / real Ubuntu installation | ✅ Passed | Secure Boot/MOK, signed updates, 4K GOP, normal redraw/About and Ubuntu boot; CPU/SMBIOS, both GPUs, NVMe/SATA and USB box display |
-| Second physical Windows system disk | ⏳ TODO | Discovery and full Windows boot with Secure Boot enabled |
-| VMware Ubuntu MOK / full dual-disk OS boot | ⏳ TODO | Separate from the completed VMware menu test |
-| Hyper-V | ⏳ TODO | Test session lacked VM-management permission |
+| Physical Windows test | ⏳ TODO | Separate system disk/ESP discovery, five-second Windows-first auto boot and full desktop boot with Secure Boot enabled |
 
 WinPE validation does not imply a completed Windows installation or Windows desktop test. The lab enrolls its own certificate only into isolated OVMF variables; those keys are not production keys.
 
@@ -302,8 +300,7 @@ Generated ESPs, VM disks, firmware variables, and private signing keys are exclu
 - [x] Ubuntu installer and repeatable installation-package tests.
 - [x] Current physical machine: 4K firmware graphics, GPU/NVMe/SATA/USB, SMBIOS and Ubuntu boot.
 - [x] Real Ubuntu installation, MOK enrollment, signed updates, backup and preserved Ubuntu recovery entry.
-- [ ] Second Windows system disk discovery and full Secure Boot launch.
-- [ ] VMware MOK / full dual-system-disk boot and Hyper-V validation.
+- [ ] Windows physical-machine test: system disk discovery, five-second Windows-first auto boot and full desktop boot with Secure Boot enabled.
 
 See [TODO.md](furry-project/TODO.md) for the complete checklist and [CHANGES.md](furry-project/CHANGES.md) for implementation notes.
 
