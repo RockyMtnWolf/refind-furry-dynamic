@@ -846,6 +846,9 @@ static VOID DrawText(IN CHAR16 *Text, IN BOOLEAN Selected, IN UINTN FieldWidth, 
     EG_IMAGE *TextBuffer;
     EG_PIXEL Bg;
 
+    if (XPos >= UGAWidth || YPos >= UGAHeight || !FieldWidth) return;
+    if (FieldWidth > UGAWidth - XPos) FieldWidth = UGAWidth - XPos;
+    if (TextLineHeight() > UGAHeight - YPos) return;
     TextBuffer = egCreateFilledImage(FieldWidth, TextLineHeight(), FALSE, &MenuBackgroundPixel);
     if (TextBuffer) {
         Bg = MenuBackgroundPixel;
@@ -986,7 +989,9 @@ VOID GraphicsMenuStyle(IN REFIT_MENU_SCREEN *Screen,
     UINTN ItemWidth;
     static UINTN LineWidth, MenuWidth, MenuHeight, EntriesPosX, TitlePosX, EntriesPosY, TimeoutPosY, CharWidth;
     EG_IMAGE *Window;
-    EG_PIXEL *BackgroundPixel = &(GlobalConfig.ScreenBackground->PixelData[0]);
+    /* Clearing the screen replaces ScreenBackground; never retain its pixels. */
+    EG_PIXEL BackgroundColor = GlobalConfig.ScreenBackground ? GlobalConfig.ScreenBackground->PixelData[0] : MenuBackgroundPixel;
+    EG_PIXEL *BackgroundPixel = &BackgroundColor;
 
     CharWidth = egGetFontCellWidth();
     State->ScrollMode = SCROLL_MODE_TEXT;

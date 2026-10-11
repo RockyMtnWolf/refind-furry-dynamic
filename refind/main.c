@@ -126,6 +126,9 @@ REFIT_CONFIG GlobalConfig = { /* TextOnly = */ FALSE,
                                                   DEFAULT_MOUSE_SIZE },
                               /* BannerScale = */ BANNER_NOSCALE,
                               /* DynamicInfo = */ FALSE,
+                              /* DynamicDeviceProbe = */ FALSE,
+                              /* DynamicSmbios = */ FALSE,
+                              /* ThemeAutoScale = */ FALSE,
                               /* LogLevel = */ 0,
                               /* *DiscoveredRoot = */ NULL,
                               /* *SelfDevicePath = */ NULL,
@@ -471,7 +474,7 @@ VOID LogBasicInfo(VOID) {
 // main entry point
 //
 EFI_STATUS
-EFIAPI
+REFIT_ENTRYAPI
 efi_main (EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
     EFI_STATUS         Status;

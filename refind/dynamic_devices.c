@@ -5,6 +5,7 @@
 #include "global.h"
 #include "libeg.h"
 #include "dynamic_devices.h"
+#include "log.h"
 #include "../include/refit_call_wrapper.h"
 #ifdef __MAKEWITH_GNUEFI
 #include <efipciio.h>
@@ -12,6 +13,7 @@ typedef EFI_DEVICE_PATH EFI_DEVICE_PATH_PROTOCOL;
 #endif
 #include "../include/vendor/DiskInfo.h"
 #include "../include/vendor/NvmExpressPassthru.h"
+#include "../include/vendor/UsbIoSubset.h"
 
 static UINTN PathLength(EFI_DEVICE_PATH *p) {
     UINTN n=0,l;
@@ -45,12 +47,18 @@ static CHAR16 *Transport(EFI_DEVICE_PATH *p) {
     return L"Block I/O";
 }
 static VOID AsciiField(CHAR16 *out, UINT8 *in, UINTN len, BOOLEAN swap) {
-    UINTN i,j=0; UINT8 c;
+    UINTN i,j=0; UINT8 c; BOOLEAN meaningful=FALSE;
+    out[0]=0;
+    if(swap && (len&1)) return;
+    while(len && (in[swap?((len-1)^1):len-1]==' ' || in[swap?((len-1)^1):len-1]==0)) len--;
     for(i=0;i<len && j<63;i++) {
-        c=in[swap?(i^1):i]; out[j++]=(c>=32 && c<127)?c:'?';
+        c=in[swap?(i^1):i];
+        if(c<32 || c>=127) { out[0]=0; return; }
+        if((c>='0' && c<='9') || (c>='A' && c<='Z') || (c>='a' && c<='z')) meaningful=TRUE;
+        out[j++]=c;
     }
-    while(j && (out[j-1]==' ' || out[j-1]=='?')) j--;
     out[j]=0;
+    if(!meaningful) out[0]=0;
 }
 static UINTN Hex4(UINT8 *p) {
     UINTN i,v=0,c;
@@ -64,46 +72,50 @@ static UINTN Hex4(UINT8 *p) {
     return v;
 }
 /* Updateable, bounded ASCII database. Exact PCI IDs only. */
-static BOOLEAN GpuName(UINT16 vendor,UINT16 device,CHAR16 *name) {
-    UINT8 *data=NULL; UINTN size=0,i=0,j,k;
+static BOOLEAN GpuName(UINT16 vendor,UINT16 device,UINT16 subvendor,UINT16 subdevice,CHAR16 *name) {
+    UINT8 *data=NULL; UINTN size=0,i=0,j,k,start; BOOLEAN exact=FALSE,found=FALSE;
     if(EFI_ERROR(egLoadFile(SelfDir,L"themes\\finn-term\\gpu-names.txt",&data,&size))) return FALSE;
     if(size>65536) { FreePool(data); return FALSE; }
     while(i+10<size) {
         j=i; while(j<size && data[j]!='\n') j++;
-        if(j-i>10 && data[i+4]==':' && data[i+9]=='|' &&
-           Hex4(data+i)==vendor && Hex4(data+i+5)==device) {
-            k=0; i+=10;
-            while(i<j && data[i]!='\r' && k<63) {
-                name[k++]=data[i]>=32 && data[i]<127?data[i]:'?'; i++;
+        start=0;
+        if(j-i>10 && data[i+4]==':' && Hex4(data+i)==vendor && Hex4(data+i+5)==device) {
+            if(data[i+9]=='|' && !exact) start=i+10;
+            else if(j-i>20 && data[i+9]==':' && data[i+14]==':' && data[i+19]=='|' &&
+                    Hex4(data+i+10)==subvendor && Hex4(data+i+15)==subdevice) {
+                start=i+20; exact=TRUE;
             }
-            name[k]=0; FreePool(data); return k!=0;
+            if(start) {
+                k=0; while(start<j && data[start]!='\r' && k<63) {
+                    name[k++]=data[start]>=32 && data[start]<127?data[start]:'?'; start++;
+                }
+                name[k]=0; found=k!=0;
+            }
         }
         i=j+1;
     }
-    FreePool(data); return FALSE;
+    FreePool(data); return found;
 }
-VOID DynamicGpu(CHAR16 *text,UINTN bytes) {
-    EFI_GUID guid=EFI_PCI_IO_PROTOCOL_GUID,gop=EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
-    EFI_HANDLE *handles=NULL; EFI_PCI_IO_PROTOCOL *pci; VOID *graphics;
-    UINTN count=0,i,total=0; UINT8 config[16]; UINT16 vendor=0,device=0;
-    BOOLEAN chosen=FALSE,active=FALSE; CHAR16 name[64],extra[20];
-    SPrint(text,bytes,L"unavailable (PCI I/O)");
-    if(EFI_ERROR(refit_call5_wrapper(BS->LocateHandleBuffer,ByProtocol,&guid,NULL,&count,&handles))) return;
+VOID DynamicGpus(DYNAMIC_DEVICE_LINE emit, VOID *context) {
+    EFI_GUID guid=EFI_PCI_IO_PROTOCOL_GUID;
+    EFI_HANDLE *handles=NULL; EFI_PCI_IO_PROTOCOL *pci;
+    UINTN count=0,i,total=0; UINT8 config[48]; UINT16 vendor,device,subvendor,subdevice;
+    CHAR16 name[64];
+    if(EFI_ERROR(refit_call5_wrapper(BS->LocateHandleBuffer,ByProtocol,&guid,NULL,&count,&handles))) {
+        emit(1,L"n/a",context); return;
+    }
     for(i=0;i<count;i++) {
         if(EFI_ERROR(refit_call3_wrapper(BS->HandleProtocol,handles[i],&guid,(VOID **)&pci))) continue;
-        if(EFI_ERROR(refit_call5_wrapper(pci->Pci.Read,pci,EfiPciIoWidthUint8,0,16,config)) || config[11]!=3) continue;
-        total++;
-        if(!chosen || (!active && !EFI_ERROR(refit_call3_wrapper(BS->HandleProtocol,handles[i],&gop,&graphics)))) {
-            vendor=config[0]|((UINT16)config[1]<<8); device=config[2]|((UINT16)config[3]<<8);
-            active=!EFI_ERROR(refit_call3_wrapper(BS->HandleProtocol,handles[i],&gop,&graphics)); chosen=TRUE;
-        }
+        if(EFI_ERROR(refit_call5_wrapper(pci->Pci.Read,pci,EfiPciIoWidthUint8,0,sizeof(config),config)) || config[11]!=3) continue;
+        vendor=(config[0]|((UINT16)config[1]<<8)); device=(config[2]|((UINT16)config[3]<<8));
+        subvendor=0; subdevice=0;
+        if((config[14]&0x7f)==0) { subvendor=(config[44]|((UINT16)config[45]<<8)); subdevice=(config[46]|((UINT16)config[47]<<8)); }
+        if(!GpuName(vendor,device,subvendor,subdevice,name))
+            SPrint(name,sizeof(name),L"%s GPU [%04x:%04x]",vendor==0x10de?L"NVIDIA":vendor==0x1002?L"AMD":vendor==0x8086?L"Intel":L"PCI",vendor,device);
+        LOG(1, LOG_LINE_NORMAL, L"GPU probe: %04x:%04x / %04x:%04x = %s",vendor,device,subvendor,subdevice,name);
+        if(!emit(++total,name,context)) break;
     }
-    FreePool(handles); if(!chosen) return;
-    if(!GpuName(vendor,device,name)) {
-        SPrint(name,sizeof(name),L"%s display controller",vendor==0x10de?L"NVIDIA":vendor==0x1002?L"AMD":vendor==0x8086?L"Intel":L"PCI");
-    }
-    extra[0]=0; if(total>1) SPrint(extra,sizeof(extra),L" +%d",total-1);
-    SPrint(text,bytes,L"%s [%04x:%04x]%s",name,vendor,device,extra);
+    FreePool(handles); if(!total) emit(1,L"n/a",context);
 }
 /* Identify Controller opcode 0x06/CNS=1 only; no data writes or admin changes. */
 static BOOLEAN NvmeName(EFI_DEVICE_PATH *disk,CHAR16 *name) {
@@ -129,49 +141,150 @@ static BOOLEAN NvmeName(EFI_DEVICE_PATH *disk,CHAR16 *name) {
     }
     FreePool(handles); return found;
 }
-static VOID DiskName(EFI_HANDLE handle,EFI_DEVICE_PATH *path,CHAR16 *name) {
-    EFI_GUID guid=EFI_DISK_INFO_PROTOCOL_GUID,nv=EFI_DISK_INFO_NVME_INTERFACE_GUID;
-    EFI_GUID ata=EFI_DISK_INFO_IDE_INTERFACE_GUID,ahci=EFI_DISK_INFO_AHCI_INTERFACE_GUID;
-    EFI_GUID scsi=EFI_DISK_INFO_SCSI_INTERFACE_GUID; EFI_DISK_INFO_PROTOCOL *info; UINT8 data[4096]; UINT32 size;
-    name[0]=0;
-    if(!EFI_ERROR(refit_call3_wrapper(BS->HandleProtocol,handle,&guid,(VOID **)&info))) {
-        size=sizeof(data);
-        if(info->Identify && !EFI_ERROR(refit_call3_wrapper(info->Identify,info,data,&size))) {
-            if(CompareGuid(&info->Interface,&nv)==0 && size>=64) AsciiField(name,data+24,40,FALSE);
-            else if((CompareGuid(&info->Interface,&ata)==0 || CompareGuid(&info->Interface,&ahci)==0) && size>=94)
-                AsciiField(name,data+54,40,TRUE);
-        }
-        if(!name[0] && CompareGuid(&info->Interface,&scsi)==0 && info->Inquiry) {
-            size=sizeof(data);
-            if(!EFI_ERROR(refit_call3_wrapper(info->Inquiry,info,data,&size)) && size>=32) AsciiField(name,data+8,24,FALSE);
+/* Match the nearest USB ancestor, so a hub or another enclosure cannot win. */
+static BOOLEAN UsbBoxName(EFI_DEVICE_PATH *disk, CHAR16 *name) {
+    EFI_GUID guid=FURRY_USB_IO_GUID,dp=EFI_DEVICE_PATH_PROTOCOL_GUID;
+    EFI_HANDLE *handles=NULL; FURRY_USB_IO *usb=NULL,*candidate;
+    EFI_DEVICE_PATH *path; UINTN count=0,i,best=0,n,j,attempt;
+    FURRY_USB_DEVICE_DESCRIPTOR desc; EFI_STATUS status;
+    UINT16 *languages=NULL,bytes=0,language=0x0409; CHAR16 *product=NULL;
+    status=refit_call5_wrapper(BS->LocateHandleBuffer,ByProtocol,&guid,NULL,&count,&handles);
+    LOG(1, LOG_LINE_NORMAL, L"Disk probe: USB IO locate = %r, handles=%d",status,count);
+    if(EFI_ERROR(status)) return FALSE;
+    for(i=0;i<count;i++) {
+        if(EFI_ERROR(refit_call3_wrapper(BS->HandleProtocol,handles[i],&dp,(VOID **)&path)) || !ParentPath(path,disk)) continue;
+        n=PathLength(path); if(n<=best) continue;
+        if(EFI_ERROR(refit_call3_wrapper(BS->HandleProtocol,handles[i],&guid,(VOID **)&candidate)) || !candidate) continue;
+        best=n; usb=candidate;
+    }
+    FreePool(handles);
+    LOG(1, LOG_LINE_NORMAL, L"Disk probe: USB IO matching ancestor=%d",usb!=NULL);
+    if(!usb || !usb->GetDeviceDescriptor) return FALSE;
+    SetMem(&desc,sizeof(desc),0);
+    status=refit_call2_wrapper(usb->GetDeviceDescriptor,usb,&desc);
+    LOG(1, LOG_LINE_NORMAL, L"Disk probe: USB descriptor = %r, VID:PID=%04x:%04x, product index=%d",status,desc.IdVendor,desc.IdProduct,desc.StrProduct);
+    if(EFI_ERROR(status) || desc.Length<sizeof(desc) || desc.DescriptorType!=1) return FALSE;
+    if(usb->GetSupportedLanguages) {
+        status=refit_call3_wrapper(usb->GetSupportedLanguages,usb,&languages,&bytes);
+        LOG(1, LOG_LINE_NORMAL, L"Disk probe: USB languages = %r, bytes=%d",status,bytes);
+        if(!EFI_ERROR(status) && languages && bytes>=2 && !(bytes&1)) language=languages[0];
+        /* Language storage belongs to the USB driver: do not free it. */
+    }
+    if(desc.StrProduct && usb->GetStringDescriptor) {
+        for(attempt=0;attempt<2;attempt++) {
+            if(attempt) { if(language==0x0409) break; language=0x0409; }
+            product=NULL;
+            status=refit_call4_wrapper(usb->GetStringDescriptor,usb,language,desc.StrProduct,&product);
+            LOG(1, LOG_LINE_NORMAL, L"Disk probe: USB product string lang=%04x = %r",language,status);
+            if(!EFI_ERROR(status) && product) {
+                for(j=0;j<48 && product[j];j++) {
+                    if(product[j]<32 || product[j]>=127) { j=0; break; }
+                    name[j]=product[j];
+                }
+                name[j]=0;
+                while(j && name[j-1]==' ') name[--j]=0;
+                if(j) { FreePool(product); StrCat(name,L" [box]");
+                    LOG(1, LOG_LINE_NORMAL, L"Disk probe: USB box result = %s",name); return TRUE; }
+            }
+            if(product) FreePool(product);
         }
     }
-    if(!name[0] && CompareMem(Transport(path),L"NVMe",8)==0) NvmeName(path,name);
-    if(!name[0]) StrCpy(name,L"model unavailable");
+    SPrint(name,64*sizeof(CHAR16),L"USB box [%04x:%04x]",desc.IdVendor,desc.IdProduct);
+    LOG(1, LOG_LINE_NORMAL, L"Disk probe: USB box ID fallback = %s",name);
+    return TRUE;
 }
-VOID DynamicDisk(CHAR16 *text,UINTN bytes) {
+/* Log only the bounded model field, never serial numbers or disk contents. */
+static VOID ModelBytes(UINT8 *data, UINTN length) {
+    CHAR16 hex[128],part[4]; UINTN i;
+    hex[0]=0;
+    for(i=0;i<length && i<40;i++) {
+        SPrint(part,sizeof(part),L"%02x",data[i]); StrCat(hex,part); StrCat(hex,L" ");
+    }
+    LOG(1, LOG_LINE_NORMAL, L"Disk probe: model field hex = %s",hex);
+}
+static VOID DiskName(EFI_HANDLE handle,EFI_DEVICE_PATH *path,CHAR16 *name) {
+    EFI_GUID guid=EFI_DISK_INFO_PROTOCOL_GUID,usb=EFI_DISK_INFO_USB_INTERFACE_GUID;
+    EFI_GUID ata=EFI_DISK_INFO_IDE_INTERFACE_GUID,ahci=EFI_DISK_INFO_AHCI_INTERFACE_GUID;
+    EFI_GUID scsi=EFI_DISK_INFO_SCSI_INTERFACE_GUID; EFI_DISK_INFO_PROTOCOL *info=NULL;
+    UINT8 data[4096]; UINT32 size; EFI_STATUS status; BOOLEAN ataFormat,inquiryFormat;
+    name[0]=0;
+    LOG(1, LOG_LINE_NORMAL, L"Disk probe: model lookup, transport=%s",Transport(path));
+    /* NVMe DiskInfo contains namespace data, not controller model text. */
+    if(CompareMem(Transport(path),L"NVMe",8)==0) {
+        LOG(1, LOG_LINE_NORMAL, L"Disk probe: using NVMe Identify Controller");
+        NvmeName(path,name);
+    } else {
+        status=refit_call3_wrapper(BS->HandleProtocol,handle,&guid,(VOID **)&info);
+        LOG(1, LOG_LINE_NORMAL, L"Disk probe: HandleProtocol(DiskInfo) = %r",status);
+        if(!EFI_ERROR(status) && info) {
+            ataFormat=CompareGuid(&info->Interface,&ata)==0 || CompareGuid(&info->Interface,&ahci)==0;
+            inquiryFormat=CompareGuid(&info->Interface,&scsi)==0 || CompareGuid(&info->Interface,&usb)==0;
+            LOG(1, LOG_LINE_NORMAL, L"Disk probe: interface=%g, ATA=%d, USB/SCSI=%d, Identify=%d, Inquiry=%d",
+                &info->Interface,ataFormat,inquiryFormat,info->Identify!=NULL,info->Inquiry!=NULL);
+            if(ataFormat && info->Identify) {
+                size=sizeof(data); SetMem(data,sizeof(data),0);
+                LOG(1, LOG_LINE_NORMAL, L"Disk probe: calling Identify");
+                status=refit_call3_wrapper(info->Identify,info,data,&size);
+                LOG(1, LOG_LINE_NORMAL, L"Disk probe: Identify = %r, bytes=%d",status,size);
+                if(!EFI_ERROR(status) && size>=94 && size<=sizeof(data)) {
+                    ModelBytes(data+54,40); AsciiField(name,data+54,40,TRUE);
+                    LOG(1, LOG_LINE_NORMAL, L"Disk probe: Identify model accepted=%d",name[0]!=0);
+                }
+            }
+            if(!name[0] && inquiryFormat && info->Inquiry) {
+                size=sizeof(data); SetMem(data,sizeof(data),0);
+                LOG(1, LOG_LINE_NORMAL, L"Disk probe: calling Inquiry");
+                status=refit_call3_wrapper(info->Inquiry,info,data,&size);
+                LOG(1, LOG_LINE_NORMAL, L"Disk probe: Inquiry = %r, bytes=%d",status,size);
+                if(!EFI_ERROR(status) && size>=32 && size<=sizeof(data)) {
+                    ModelBytes(data+8,24); AsciiField(name,data+8,24,FALSE);
+                    LOG(1, LOG_LINE_NORMAL, L"Disk probe: Inquiry model accepted=%d",name[0]!=0);
+                } else if(!EFI_ERROR(status) && size>0 && size<32) {
+                    LOG(1, LOG_LINE_NORMAL, L"Disk probe: short Inquiry payload (%d bytes)",size);
+                    ModelBytes(data,size);
+                    /* A USB firmware label may be returned instead of SCSI data.
+                     * Reject binary/truncated SCSI headers; label its provenance. */
+                    if(CompareGuid(&info->Interface,&usb)==0) {
+                        AsciiField(name,data,size,FALSE);
+                        if(name[0]) StrCat(name,L" [USB label]");
+                    }
+                    LOG(1, LOG_LINE_NORMAL, L"Disk probe: short USB label accepted=%d",name[0]!=0);
+                }
+            } else if(!name[0]) {
+                LOG(1, LOG_LINE_NORMAL, L"Disk probe: Inquiry skipped (unsupported format or missing function)");
+            }
+        } else if(!EFI_ERROR(status)) {
+            LOG(1, LOG_LINE_NORMAL, L"Disk probe: DiskInfo returned a NULL interface");
+        }
+    }
+    if(!name[0] && CompareMem(Transport(path),L"USB",6)==0) UsbBoxName(path,name);
+    if(!name[0]) StrCpy(name,L"unknown model");
+    LOG(1, LOG_LINE_NORMAL, L"Disk probe: model result = %s",name);
+}
+/* Enumerate whole media once; partitions are not additional disks. */
+VOID DynamicDisks(DYNAMIC_DEVICE_LINE emit, VOID *context) {
     EFI_GUID guid=EFI_BLOCK_IO_PROTOCOL_GUID,dp=EFI_DEVICE_PATH_PROTOCOL_GUID;
-    EFI_HANDLE *handles=NULL,selected=NULL; EFI_BLOCK_IO_PROTOCOL *io;
-    EFI_DEVICE_PATH *path,*chosenPath=NULL,*boot=NULL; UINTN count=0,i,total=0,rank,best=0;
-    UINT64 capacity=0; CHAR16 name[64],size[32],extra[20];
-    SPrint(text,bytes,L"unavailable (Block I/O)");
-    refit_call3_wrapper(BS->HandleProtocol,SelfLoadedImage->DeviceHandle,&dp,(VOID **)&boot);
-    if(EFI_ERROR(refit_call5_wrapper(BS->LocateHandleBuffer,ByProtocol,&guid,NULL,&count,&handles))) return;
+    EFI_HANDLE *handles=NULL; EFI_BLOCK_IO_PROTOCOL *io;
+    EFI_DEVICE_PATH *path; UINTN count=0,i,total=0;
+    UINT64 capacity; CHAR16 name[64],size[32],text[128];
+    if(EFI_ERROR(refit_call5_wrapper(BS->LocateHandleBuffer,ByProtocol,&guid,NULL,&count,&handles))) {
+        emit(1,L"n/a",context); return;
+    }
     for(i=0;i<count;i++) {
         if(EFI_ERROR(refit_call3_wrapper(BS->HandleProtocol,handles[i],&guid,(VOID **)&io)) || !io->Media) continue;
         if(io->Media->LogicalPartition || !io->Media->MediaPresent || !io->Media->BlockSize) continue;
         path=NULL; refit_call3_wrapper(BS->HandleProtocol,handles[i],&dp,(VOID **)&path);
-        total++; rank=io->Media->RemovableMedia?1:2; if(ParentPath(path,boot)) rank+=4;
-        if(rank>best) {
-            selected=handles[i]; chosenPath=path; best=rank; capacity=0;
-            if(io->Media->LastBlock<~(UINT64)0 && io->Media->LastBlock+1<=~(UINT64)0/io->Media->BlockSize)
-                capacity=(io->Media->LastBlock+1)*io->Media->BlockSize;
-        }
+        capacity=0;
+        if(io->Media->LastBlock<~(UINT64)0 && io->Media->LastBlock+1<=~(UINT64)0/io->Media->BlockSize)
+            capacity=(io->Media->LastBlock+1)*io->Media->BlockSize;
+        LOG(1, LOG_LINE_NORMAL, L"Disk probe: disk%d, transport=%s, capacity=%ld bytes, removable=%d",total+1,Transport(path),capacity,io->Media->RemovableMedia);
+        if(GlobalConfig.DynamicDeviceProbe) DiskName(handles[i],path,name);
+        else StrCpy(name,L"model probe disabled");
+        if(capacity>=1000000000) SPrint(size,sizeof(size),L"%ld.%d GB",capacity/1000000000,(UINTN)(capacity%1000000000/100000000));
+        else SPrint(size,sizeof(size),L"%ld MiB",capacity/(1024*1024));
+        SPrint(text,sizeof(text),L"%s / %s / %s",name,size,Transport(path));
+        if(!emit(++total,text,context)) break;
     }
-    FreePool(handles); if(!selected) return;
-    DiskName(selected,chosenPath,name);
-    if(capacity>=1000000000) SPrint(size,sizeof(size),L"%ld.%d GB",capacity/1000000000,(UINTN)(capacity%1000000000/100000000));
-    else SPrint(size,sizeof(size),L"%ld MiB",capacity/(1024*1024));
-    extra[0]=0; if(total>1) SPrint(extra,sizeof(extra),L" +%d disks",total-1);
-    SPrint(text,bytes,L"%s / %s [%s]%s",name,size,Transport(chosenPath),extra);
+    FreePool(handles);
+    if(!total) emit(1,L"n/a",context);
 }

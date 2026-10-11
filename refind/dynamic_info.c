@@ -29,11 +29,11 @@ static UINT64 SmbiosMemory(VOID) {
     for(i=0;i<ST->NumberOfTableEntries;i++) {
         ep=ST->ConfigurationTable[i].VendorTable;
         if(CompareGuid(&ST->ConfigurationTable[i].VendorGuid,&Smbios3)==0 &&
-           ep && CompareMem(ep,"_SM3_",5)==0 && ep[6]>=24 && Checksum(ep,ep[6])) {
+           ep && CompareMem(ep,"_SM3_",5)==0 && ep[6]>=24 && ep[6]<=32 && Checksum(ep,ep[6])) {
             len=Read32(ep+12); table=(UINT8 *)(UINTN)Read64(ep+16); break;
         }
         if(CompareGuid(&ST->ConfigurationTable[i].VendorGuid,&Smbios2)==0 &&
-           ep && CompareMem(ep,"_SM_",4)==0 && ep[5]>=31 && Checksum(ep,ep[5]) &&
+           ep && CompareMem(ep,"_SM_",4)==0 && ep[5]>=31 && ep[5]<=32 && Checksum(ep,ep[5]) &&
            CompareMem(ep+16,"_DMI_",5)==0 && Checksum(ep+16,15)) {
             len=Read16(ep+22); table=(UINT8 *)(UINTN)Read32(ep+24);
         }
@@ -129,48 +129,86 @@ static VOID CpuName(CHAR16 *out) {
 #endif
     if(!SmbiosCpu(out)) StrCpy(out,L"Unavailable (CPUID/SMBIOS)");
 }
+/* The information panel uses a smaller mask without changing the menu font. */
 static VOID Line(EG_IMAGE *frame, CHAR16 *text, UINTN x, UINTN y, BOOLEAN pink) {
-    CHAR16 safe[200]; UINTN copy; EG_IMAGE *mask; EG_PIXEL clear={0,0,0,0}; UINTN i,w=egComputeTextWidth(text),h=egGetFontHeight();
+    CHAR16 safe[200]; UINTN copy, cells, length, i, w, h=egGetFontHeight();
+    UINTN maxWidth, scaledWidth, scaledHeight=h*3/4;
+    EG_IMAGE *mask, *scaled; EG_PIXEL clear={0,0,0,0};
+    if(x>=frame->Width*62/100 || y>=frame->Height || !scaledHeight || scaledHeight>frame->Height-y) return;
     for(copy=0;copy<199 && text[copy];copy++) safe[copy]=text[copy];
     safe[copy]=0; text=safe;
-    if(x>=frame->Width || y>=frame->Height || y+h>frame->Height) return;
-    { UINTN maxWidth=frame->Width*62/100-x, cells=maxWidth/egGetFontCellWidth(),length=StrLen(text);
-      if(length>cells && cells>=4) { text[cells]=0; text[cells-1]='.'; text[cells-2]='.'; text[cells-3]='.'; w=egComputeTextWidth(text); }
+    maxWidth=frame->Width*62/100-x;
+    cells=maxWidth*4/(egGetFontCellWidth()*3);
+    length=StrLen(text);
+    if(length>cells) {
+        text[cells]=0;
+        if(cells>=3) { text[cells-1]='.'; text[cells-2]='.'; text[cells-3]='.'; }
     }
-    if(w>frame->Width-x) w=frame->Width-x;
-    if(!w) return;
+    w=egComputeTextWidth(text); scaledWidth=w*3/4;
+    if(!scaledWidth) return;
     mask=egCreateFilledImage(w,h,TRUE,&clear); if(!mask) return;
     egRenderText(text,mask,0,0,0);
     for(i=0;i<w*h;i++) { mask->PixelData[i].a=mask->PixelData[i].b;
         mask->PixelData[i].r=pink?244:167;
         mask->PixelData[i].g=pink?114:139; mask->PixelData[i].b=pink?182:250; }
-    egComposeImage(frame,mask,x,y); egFreeImage(mask);
+    scaled=egScaleImage(mask,scaledWidth,scaledHeight);
+    egFreeImage(mask);
+    if(scaled) { egComposeImage(frame,scaled,x,y); egFreeImage(scaled); }
+}
+typedef struct { EG_IMAGE *Frame; UINTN X, Y, Step; } DISK_PANEL;
+static BOOLEAN DiskLine(UINTN index, CHAR16 *text, VOID *context) {
+    DISK_PANEL *panel=context; CHAR16 buf[200];
+    SPrint(buf,sizeof(buf),L"> disk%d   :: %s",index,text);
+    Line(panel->Frame,buf,panel->X,panel->Y,FALSE);
+    panel->Y+=panel->Step;
+    /* Reserve a final row for the boot prompt. */
+    return panel->Y+panel->Step+egGetFontHeight()*3/4<=panel->Frame->Height;
+}
+static BOOLEAN GpuLine(UINTN index, CHAR16 *text, VOID *context) {
+    DISK_PANEL *panel=context; CHAR16 buf[200];
+    SPrint(buf,sizeof(buf),L"> gpu%d    :: %s",index,text);
+    Line(panel->Frame,buf,panel->X,panel->Y,FALSE);
+    panel->Y+=panel->Step;
+    return panel->Y+panel->Step+egGetFontHeight()*3/4<=panel->Frame->Height;
 }
 VOID DrawDynamicInfo(VOID) {
-    EG_IMAGE *frame; CHAR16 cpu[64],buf[200],vendor[49],gpu[128],disk[128];
+    EG_IMAGE *frame; CHAR16 cpu[64],buf[200],vendor[49];
     EFI_GUID global=EFI_GLOBAL_VARIABLE; EFI_STATUS status; UINTN size=1,i;
-    UINT8 secure=0; UINT64 memory; BOOLEAN smbios; UINTN x,y,step;
+    DISK_PANEL disks; BOOLEAN installedMemory; UINT8 secure=0; UINT64 memory; UINTN x,y,step;
+    LOG(1, LOG_LINE_NORMAL, L"Dynamic info: copying framebuffer");
     frame=egCopyScreen(); if(!frame) { LOG(1, LOG_LINE_NORMAL, L"Dynamic info: screen copy allocation failed"); return; }
-    x=frame->Width*35/1000; y=frame->Height*55/1000; step=egGetFontHeight()+frame->Height/90;
-    memory=SmbiosMemory(); smbios=memory!=0; if(!memory) memory=MappedMemory(); CpuName(cpu);
-    DynamicGpu(gpu,sizeof(gpu)); DynamicDisk(disk,sizeof(disk));
-    LOG(2, LOG_LINE_NORMAL, L"Dynamic info: CPU '%s', RAM %ld MiB, GPU '%s', disk '%s'",cpu,memory/(1024*1024),gpu,disk);
+    x=frame->Width*35/1000; y=frame->Height*55/1000; step=egGetFontHeight()*3/4+frame->Height/90;
+    LOG(1, LOG_LINE_NORMAL, L"Dynamic info: reading SMBIOS");
+    /* Raw firmware tables are optional on physical systems. */
+    memory=GlobalConfig.DynamicSmbios?SmbiosMemory():0;
+    installedMemory=memory!=0;
+    LOG(1, LOG_LINE_NORMAL, L"Dynamic info: SMBIOS read complete, installed RAM %ld MiB",memory/(1024*1024));
+    if (!GlobalConfig.DynamicSmbios) { SmbiosTable=NULL; SmbiosLength=0; }
+    LOG(1, LOG_LINE_NORMAL, L"Dynamic info: reading CPU/memory");
+    if(!memory) memory=MappedMemory();
+    CpuName(cpu);
     for(i=0; i<48 && ST->FirmwareVendor && ST->FirmwareVendor[i]; i++)
         vendor[i]=ST->FirmwareVendor[i]>=32 && ST->FirmwareVendor[i]<127?ST->FirmwareVendor[i]:'?';
     vendor[i]=0;
-    Line(frame,L"furry // firmware boot sequence",x,y,TRUE); y+=step;
-    Line(frame,L"--------------------------------------------------------------",x,y,FALSE); y+=step;
+    Line(frame,L"furry // ready to boot",x,y,TRUE); y+=step;
+    Line(frame,L"----------------------------------------",x,y,FALSE); y+=step;
     SPrint(buf,sizeof(buf),L"> cpu     :: %s",cpu); Line(frame,buf,x,y,FALSE); y+=step;
-    if(memory) SPrint(buf,sizeof(buf),L"> memory  :: %ld MiB [%s]",memory/(1024*1024),smbios?MemoryDetail:L"EFI mapped RAM");
-    else StrCpy(buf,L"> memory  :: unavailable");
+    if(memory) SPrint(buf,sizeof(buf),L"> ram     :: %ld.%d GB",memory/(1024*1024*1024),(UINTN)(memory%(1024*1024*1024)/(1024*1024*1024/10)));
+    else StrCpy(buf,L"> ram     :: n/a");
+    if(installedMemory && MemoryDetail[0]) { StrCat(buf,L" / "); StrCat(buf,MemoryDetail); }
     Line(frame,buf,x,y,FALSE); y+=step;
-    SPrint(buf,sizeof(buf),L"> firmware:: %s / rev 0x%x",vendor,ST->FirmwareRevision); Line(frame,buf,x,y,FALSE); y+=step;
+    SPrint(buf,sizeof(buf),L"> bios    :: %s",vendor); Line(frame,buf,x,y,FALSE); y+=step;
     SPrint(buf,sizeof(buf),L"> uefi    :: %d.%02d",ST->Hdr.Revision>>16,ST->Hdr.Revision&0xffff); Line(frame,buf,x,y,FALSE); y+=step;
     status=refit_call5_wrapper(RT->GetVariable,L"SecureBoot",&global,NULL,&size,&secure);
-    SPrint(buf,sizeof(buf),L"> secure  :: %s",EFI_ERROR(status)?L"UNKNOWN (variable unavailable)":secure?L"ON":L"OFF");
+    SPrint(buf,sizeof(buf),L"> secure  :: %s",EFI_ERROR(status)?L"n/a":secure?L"ON":L"OFF");
     Line(frame,buf,x,y,TRUE); y+=step;
-    SPrint(buf,sizeof(buf),L"> gpu     :: %s",gpu); Line(frame,buf,x,y,FALSE); y+=step;
-    SPrint(buf,sizeof(buf),L"> disk    :: %s",disk); Line(frame,buf,x,y,FALSE); y+=step;
-    Line(frame,L"> awaiting boot target ...",x,y,TRUE);
+    disks.Frame=frame; disks.X=x; disks.Y=y; disks.Step=step;
+    if(GlobalConfig.DynamicDeviceProbe) DynamicGpus(GpuLine,&disks);
+    else GpuLine(1,L"probe off",&disks);
+    if(GlobalConfig.DynamicDeviceProbe) DynamicDisks(DiskLine,&disks);
+    else DiskLine(1,L"probe off",&disks);
+    y=disks.Y;
+    Line(frame,L"> choose your OS ...",x,y,TRUE);
     egDrawImage(frame,0,0); egFreeImage(frame);
+    LOG(1, LOG_LINE_NORMAL, L"Dynamic info: complete");
 }

@@ -3,3 +3,9 @@
 15ad:0405|VMware SVGA II (virtual)
 1b36:0100|QEMU QXL (virtual)
 1af4:1050|Virtio GPU (virtual)
+
+# Optional subsystem IDs disambiguate boards sharing a device ID.
+10de:28b0|NVIDIA RTX 2000 / 2000E Ada
+10de:28b0:10de:1870|NVIDIA RTX 2000 Ada
+10de:28b0:10de:1871|NVIDIA RTX 2000E Ada
+1002:13c0|AMD Radeon Graphics (Granite Ridge)

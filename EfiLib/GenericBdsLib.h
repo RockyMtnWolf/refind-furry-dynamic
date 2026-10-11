@@ -470,11 +470,13 @@ BdsLibMatchDevicePaths (
   @return A newly allocated Unicode string that represents the device path.
 
 **/
+#ifndef __MAKEWITH_GNUEFI
 CHAR16 *
 EFIAPI
 DevicePathToStr (
   IN EFI_DEVICE_PATH_PROTOCOL     *DevPath
   );
+#endif
 
 #ifdef __MAKEWITH_TIANO
 //

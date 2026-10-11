@@ -16,16 +16,21 @@
 - [x] Windows default selection, visible five-second countdown, and automatic demo EFI launch in VMware.
 - [x] Ubuntu installer package staging, repeatability, configuration, and invalid EFI rejection.
 
-## Physical-Machine Validation — TODO
+## Current Physical-Machine Validation — Completed (Ubuntu, 2026-10-11–12)
 
-- [ ] Firmware GOP modes and scaling across target monitors.
-- [ ] Real CPUID/SMBIOS values, DIMM capacity/type/speed, GPU PCI IDs, and NVMe/SATA model reporting.
-- [ ] Ubuntu installation with Secure Boot disabled.
-- [ ] Ubuntu MOK enrollment and signed rEFInd installation with Secure Boot enabled.
-- [ ] Installation updates using the existing signing key and recovery of the original BootOrder.
-- [ ] Second Windows system disk discovery across its own ESP.
-- [ ] Complete Windows desktop boot with Secure Boot enabled, including the five-second default selection.
-- [ ] Complete Ubuntu boot and return/rescan behavior on physical firmware.
+- [x] Current monitor: maximum GOP mode (3840×2160), smaller panel text and larger OS icons.
+- [x] CPUID/SMBIOS RAM, NVIDIA RTX 2000 Ada / AMD graphics and separate NVMe/SATA disks; USB enclosure descriptor fallback.
+- [x] Ubuntu MOK enrollment and signed rEFInd installation with Secure Boot enabled.
+- [x] Signed updates with the existing key, EFI/BootOrder backups, original Ubuntu/fallback files preserved and recovery entry available.
+- [x] Repeated Ubuntu boot, normal menu refresh and working About submenu on current firmware.
+
+## Remaining Physical Coverage
+
+- [ ] Secure Boot disabled.
+- [ ] Other monitors/firmware and loader-return/rescan scenarios.
+- [ ] Second Windows system disk discovery and full Windows desktop boot with Secure Boot enabled.
+- [ ] Bare-metal five-second automatic boot after the final configuration change.
+- [ ] Actual restoration from backup (backup integrity and the recovery entry are verified).
 
 Use [HARDWARE-TEST.md](HARDWARE-TEST.md) for the detailed physical-machine checklist.
 

@@ -83,7 +83,7 @@ OPTIMFLAGS      = -Os -fno-strict-aliasing -fno-tree-loop-distribute-patterns
 CFLAGS          = $(OPTIMFLAGS) -fno-stack-protector -fshort-wchar -Wall
 
 # ...for GNU-EFI....
-GNUEFI_CFLAGS   = -fpic -I$(EFIINC) -I$(EFIINC)/$(ARCH) -I$(EFIINC)/protocol -I../include -I../refind -I../libeg -I../mok -I../gzip
+GNUEFI_CFLAGS   = -fpic -I$(EFIINC) -I$(EFIINC)/$(ARCH) -I$(EFIINC)/protocol -I../include -I../refind -I../libeg -I../mok -I../gzip -DGNU_EFI_3_0_COMPAT
 
 # ...and for TianoCore....
 TIANO_INCLUDE_DIRS = -I $(TIANOBASE)/MdePkg \
@@ -131,7 +131,7 @@ FORMAT_DRIVER   = --output-target=efi-bsdrv-$(ARCH)
 ifeq ($(ARCH),x86_64)
   GNUEFI_LDFLAGS += -znocombreloc -zdefs
 
-  ARCH_CFLAGS = -DEFIX64 -DEFI_FUNCTION_WRAPPER -m64 -mno-red-zone 
+  ARCH_CFLAGS = -DEFIX64 -DEFI_FUNCTION_WRAPPER -DGNU_EFI_USE_MS_ABI -m64 -mno-red-zone
 ifeq ($(MAKEWITH),TIANO)
   ARCH_CFLAGS += -mcmodel=large "-DEFIAPI=__attribute__((ms_abi))" 
 endif

@@ -205,7 +205,7 @@ static BOOLEAN VerifyGoOn(VOID) {
 //
 
 EFI_STATUS
-EFIAPI
+REFIT_ENTRYAPI
 efi_main    (IN EFI_HANDLE           ImageHandle,
              IN EFI_SYSTEM_TABLE     *SystemTable)
 {

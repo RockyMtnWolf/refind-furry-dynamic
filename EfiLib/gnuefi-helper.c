@@ -109,6 +109,7 @@ UnicodeStrToAsciiStr (
   @return The length of String.
 
 **/
+#ifndef strlena
 UINTN
 AsciiStrLen (
   IN      CONST CHAR8               *String
@@ -129,6 +130,7 @@ AsciiStrLen (
   }
   return Length;
 }
+#endif
 
 /**
   Determine whether a given device path is valid.

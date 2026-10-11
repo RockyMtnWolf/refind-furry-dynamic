@@ -38,10 +38,12 @@ UnicodeStrToAsciiStr (
    OUT      CHAR8               *Destination
 );
 
+#ifndef strlena
 UINTN
 AsciiStrLen (
    IN      CONST CHAR8               *String
 );
+#endif
 
 UINTN
 EFIAPI

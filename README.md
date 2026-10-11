@@ -7,7 +7,7 @@
 ![Build](https://img.shields.io/badge/Build-GNU--EFI_%7C_GCC-orange?style=for-the-badge)
 ![QEMU](https://img.shields.io/badge/QEMU_%2B_OVMF-Tests_Passed-2EA44F?style=for-the-badge)
 ![VMware](https://img.shields.io/badge/VMware-Menu_Test_Passed-2EA44F?style=for-the-badge)
-![Hardware](https://img.shields.io/badge/Physical_Hardware-TODO-yellow?style=for-the-badge)
+![Hardware](https://img.shields.io/badge/Physical_Hardware-Ubuntu_passed-brightgreen?style=for-the-badge)
 
 **A customized rEFInd boot manager with live UEFI hardware information, a purple terminal interface, and a 3840 × 2160 furry background.**
 
@@ -72,7 +72,7 @@ Set `dynamic_info true` in the theme configuration to enable the overlay. Set it
 
 ## 🧪 Validation Status
 
-**VM validation has passed for the scenarios below. Physical-machine validation remains TODO.** Tests were recorded on October 6–7, 2026.
+**VM validation and the current Ubuntu physical-machine validation have passed.** VM tests were recorded on October 6–7, 2026; physical tests on October 11–12, 2026. Physical Windows desktop boot and other machines remain untested.
 
 | Test | Status | Evidence / scope |
 | :--- | :---: | :--- |
@@ -86,7 +86,7 @@ Set `dynamic_info true` in the theme configuration to enable the overlay. Set it
 | VMware menu, GPU, NVMe | ✅ Passed | Workstation 25, virtual hardware 21; 1080p, Secure Boot OFF |
 | Windows default + five-second timeout | ✅ Passed | VMware captures of selected Windows demo entry, countdown, automatic launch |
 | Ubuntu installer package regression | ✅ Passed | Repeated staging, exact files/configuration, invalid EFI rejection |
-| Physical hardware / real Ubuntu installation | ⏳ TODO | Firmware compatibility, MOK enrollment, recovery and real OS boot |
+| Physical hardware / real Ubuntu installation | ✅ Passed | Secure Boot/MOK, signed updates, 4K GOP, normal redraw/About and Ubuntu boot; CPU/SMBIOS, both GPUs, NVMe/SATA and USB box display |
 | Second physical Windows system disk | ⏳ TODO | Discovery and full Windows boot with Secure Boot enabled |
 | VMware Ubuntu MOK / full dual-disk OS boot | ⏳ TODO | Separate from the completed VMware menu test |
 | Hyper-V | ⏳ TODO | Test session lacked VM-management permission |
@@ -115,6 +115,40 @@ default_selection "Windows,Microsoft"
 scanfor internal,external,optical,manual
 ```
 
+### Back up EFI before installation
+
+Run these commands in a local terminal on the target Ubuntu machine, before the installer. The installer backs up prior project files and BootOrder, but does not create a complete ESP image. Check the ESP device and available backup space first:
+
+```bash
+findmnt /boot/efi
+lsblk -o NAME,PATH,SIZE,FSTYPE,PARTUUID,MOUNTPOINTS
+df -h "$HOME"
+sudo bash <<'BACKUP'
+set -Eeuo pipefail
+ESP=/boot/efi
+mountpoint -q "$ESP"
+[[ $(findmnt -nro FSTYPE --target "$ESP") == vfat ]]
+DEVICE=$(findmnt -nro SOURCE --target "$ESP")
+[[ -b "$DEVICE" ]]
+OUT="/var/lib/refind-furry/backups/preinstall-$(date +%Y%m%d-%H%M%S)-$$"
+mkdir -p "$OUT"
+chmod 700 "$OUT"
+efibootmgr -v > "$OUT/efibootmgr-before.txt"
+lsblk -o NAME,PATH,SIZE,FSTYPE,PARTUUID,UUID,MOUNTPOINTS > "$OUT/disks.txt"
+findmnt "$ESP" > "$OUT/esp-mount.txt"
+sync
+dd if="$DEVICE" of="$OUT/esp.img" bs=4M status=progress
+cmp "$DEVICE" "$OUT/esp.img"
+tar -C "$ESP" -cpf "$OUT/esp-files.tar" .
+tar -C "$ESP" -df "$OUT/esp-files.tar"
+tar -C /sys/firmware/efi -cpf "$OUT/efivars-reference.tar" efivars
+(cd "$OUT"; sha256sum esp.img esp-files.tar efivars-reference.tar > SHA256SUMS; sha256sum -c SHA256SUMS)
+printf 'Verified EFI backup: %s\n' "$OUT"
+BACKUP
+```
+
+Stop if any backup command fails. Substitute your actual mounted ESP for `/boot/efi` if necessary. Copy the backup to external storage for recovery from a Live USB. The image backs up the EFI partition, not the motherboard firmware ROM or the operating system. The EFI-variable archive is for reference; do not extract it back into `efivarfs`. Avoid concurrent ESP updates while backing up.
+
 ### Secure Boot
 
 With Secure Boot disabled, one run completes installation. With Secure Boot enabled:
@@ -123,7 +157,49 @@ With Secure Boot disabled, one run completes installation. With Secure Boot enab
 2. Reboot through the existing Ubuntu shim. In MokManager, select **Enroll MOK → Continue → Yes**, enter the password, and reboot.
 3. Run the same installer again. It signs the custom rEFInd and installs the Ubuntu shim/MokManager chain.
 
-The key is stored under `/var/lib/refind-furry/keys/`; preserve it for updates and keep it private. Firmware enrollment requires your confirmation. VM signing keys are not included in the repository. This installation/MOK workflow still needs physical-machine validation.
+The key is stored under `/var/lib/refind-furry/keys/`; preserve it for updates and keep it private. Firmware enrollment requires your confirmation. VM signing keys are not included in the repository. This installation/MOK workflow has passed on the current Ubuntu physical machine.
+
+### Verify Secure Boot enrollment and test the new entry
+
+After enrollment, check from the **local host terminal**:
+
+```bash
+sudo mokutil --test-key /var/lib/refind-furry/keys/MOK.der
+sudo mokutil --list-new
+sudo efibootmgr -v
+```
+
+Continue when the key reports `is already enrolled`. Some mokutil versions print this result but return exit status 1; the installer checks the explicit enrollment message in the C locale rather than interpreting that status as a request to enroll again. If a repair exits with code 2 and says `SKIP: ... is already enrolled`, update the installer and rerun it; the EFI files were not replaced. A pending import is not completed enrollment. Restricted agent/container sessions may expose stale EFI-variable snapshots or lack kernel keyring access; use the local host result to resolve conflicting enrollment reports.
+
+If the key reports `is not enrolled`, keep the original Ubuntu entry first using the BootOrder saved before installation, then request enrollment:
+
+```bash
+sudo mokutil --import /var/lib/refind-furry/keys/MOK.der
+```
+
+Set a temporary password, reboot through the original Ubuntu shim, and select **Enroll MOK → Continue → Yes** in MokManager. Enter the password, reboot into Ubuntu, and repeat the key check. If rEFInd was not installed yet, rerun the installer after enrollment.
+
+Verify that the rEFInd entry points to `\EFI\refind-furry\shimx64.efi` with Secure Boot enabled, and that the original Ubuntu entry remains present. Entry numbers vary by machine. For a first test, choose rEFInd from the firmware boot menu, or schedule it for one boot (replace `XXXX` with its actual four-digit entry number):
+
+```bash
+sudo efibootmgr --bootnext XXXX
+```
+
+Reboot and select Ubuntu in rEFInd. Once booting works, put rEFInd first with `sudo efibootmgr --bootorder NEW_ORDER`, preserving the other entries. EFI-file and signature checks alone do not prove physical firmware boot compatibility.
+
+### Background-only screen on physical firmware
+
+The x86_64 build uses `GNU_EFI_USE_MS_ABI` and typed firmware calls so EFIAPI library functions in GNU-EFI 4.0 receive the correct calling convention. GNU-EFI CRT calls `efi_main` with the native SysV ABI, so the application entry uses `REFIT_ENTRYAPI` rather than `EFIAPI`. Marking this entry as Microsoft ABI makes it receive invalid image/system-table arguments and can fail before any log is created. `test-entry.sh` calls the actual production entry object with the CRT ABI, mocking only initialization to avoid hardware access; the repair runs this check before installing. An incompatible build can crash during SMBIOS GUID comparison after displaying the background; the SMBIOS regression test covers this path. Always perform a clean rebuild when changing ABI flags.
+
+Dynamic hardware queries run before the boot menu accepts input. Some firmware may stall in PCI or disk-controller protocols. `dynamic_device_probe false` is now the default: GPU PCI reads and disk Identify/Inquiry/NVMe commands are skipped; CPU, firmware and Secure Boot remain available; memory uses the EFI memory map by default. GPU and disk queries require explicit opt-in. Set it to `true` only after testing on your hardware. Raw SMBIOS reads also require `dynamic_smbios true`; the default is `false`. `theme_auto_scale true` scales fonts and icons independently of the information overlay, including in `--safe` mode. At 1080p the menu font is 24 pixels high, with 192-pixel OS icons and 48-pixel tools; at 4K these dimensions double. The upper-left information panel renders text at 75% of the menu font height (18 pixels at 1080p, 36 at 4K), independently of menu labels. The main icon ratio follows upstream finn-term: 256 pixels at 2560 × 1440, or 384 at 4K.
+
+If an installed build freezes after drawing the background, boot through the original Ubuntu firmware entry. From the repository root, rebuild and deploy the repair without changing BootOrder:
+
+```bash
+sudo bash furry-project/scripts/repair-ubuntu.sh
+```
+
+The repair backs up existing project EFI files and startup entries, performs a clean rebuild, installs/signs the rebuilt binary, enables `log_level 3`, restores the five-second countdown and Windows-first selection, and selects the largest available GOP resolution with automatic UI scaling. Select rEFInd manually from the firmware boot menu. If it still stalls, rerun with `--safe` to disable all dynamic information. The repair prints the installed configuration and EFI binary hash so the deployed settings can be verified. Its scan exclusions keep explicit local Ubuntu/Windows entries from appearing again as auto-scanned loaders, and hide the generic `EFI/BOOT` fallback. Submenu drawing also snapshots background color before clearing the screen and clips text to image bounds. Inspect `refind.log` in `EFI/refind-furry/` or the ESP root after returning to Ubuntu; the final diagnostic stage helps locate the stalled operation. The repaired build passed repeated boots and hardware-info tests on the current physical machine. Compatibility on other firmware still needs testing.
 
 ### Options and Recovery
 
@@ -135,7 +211,7 @@ The key is stored under `/var/lib/refind-furry/keys/`; preserve it for updates a
 | `--no-deps` | Skip dependency installation |
 | `--stage /tmp/refind-package` | Generate an unsigned installation payload without accessing system ESP/NVRAM |
 
-Prior project installations and BootOrder records are backed up under `/var/lib/refind-furry/backups/`. The installer prints a command to restore the previous BootOrder. The original Ubuntu/Windows entry remains available through the firmware boot menu. The script does not reboot automatically.
+Prior project installations and BootOrder records are backed up under `/var/lib/refind-furry/backups/`. The installer prints a command to restore the previous BootOrder. The original Ubuntu/Windows entry remains available through the firmware boot menu. The script does not reboot automatically. If the new menu fails, select the original Ubuntu entry in the firmware boot menu, then restore the saved BootOrder with `sudo efibootmgr --bootorder ORIGINAL_ORDER`. Use the value from the pre-installation backup, not an installation backup taken after activation. If neither entry boots, start an Ubuntu Live USB in UEFI mode, identify and mount the ESP using the saved PARTUUID, and restore the EFI files from `esp-files.tar`. Verify the destination partition before restoring.
 
 ## 🛠️ Build and Simulation
 
@@ -179,7 +255,7 @@ Quit any running lab before preparing/resetting its variables:
 
 Lab QMP: `127.0.0.1:4450`; VNC: `127.0.0.1:5910`. KVM uses one virtual CPU by default; `-Accelerator tcg` is available when nested acceleration is unavailable. Large images and frequent serial writes use WSL-local storage to reduce Windows-mount I/O overhead.
 
-For native Ubuntu development, install the dependencies listed in [setup.ps1](furry-project/scripts/setup.ps1), then run `bash furry-project/scripts/build.sh` and `bash furry-project/scripts/run.sh`. Parser and installer package tests are `test.sh` and `test-install-ubuntu.sh` in the same directory.
+For native Ubuntu development, install the dependencies listed in [setup.ps1](furry-project/scripts/setup.ps1), then run `bash furry-project/scripts/build.sh` and `bash furry-project/scripts/run.sh`. Parser and installer package tests are `test.sh` and `test-install-ubuntu.sh` in the same directory. `test-ui.sh` checks the compatibility overlay, font clipping, GOP mode selection and submenu background lifetime with ASan/UBSan on the build host.
 
 ### Actual OS Media
 
@@ -224,8 +300,8 @@ Generated ESPs, VM disks, firmware variables, and private signing keys are exclu
 - [x] QEMU / OVMF Secure Boot, actual Ubuntu Live / Windows WinPE boot, and parser regression tests.
 - [x] VMware menu/NVMe validation and Windows five-second countdown.
 - [x] Ubuntu installer and repeatable installation-package tests.
-- [ ] Physical firmware, GPU/NVMe, SMBIOS, and display-mode compatibility.
-- [ ] Real Ubuntu installation, MOK enrollment, updates, and recovery.
+- [x] Current physical machine: 4K firmware graphics, GPU/NVMe/SATA/USB, SMBIOS and Ubuntu boot.
+- [x] Real Ubuntu installation, MOK enrollment, signed updates, backup and preserved Ubuntu recovery entry.
 - [ ] Second Windows system disk discovery and full Secure Boot launch.
 - [ ] VMware MOK / full dual-system-disk boot and Hyper-V validation.
 
@@ -240,3 +316,27 @@ See [TODO.md](furry-project/TODO.md) for the complete checklist and [CHANGES.md]
 - **Background:** project-supplied furry artwork; original source and production PNG are included.
 
 The official source remote is `https://git.code.sf.net/p/refind/code`; the imported baseline is `cf542da4459ff18535b0ae3a7910af032834e469`. Development uses the `furry-dynamic` branch.
+
+### GPU and disk display trial
+
+After the compatibility overlay boots reliably, run `sudo bash furry-project/scripts/repair-ubuntu.sh --devices` to enable read-only PCI GPU and disk model probes. The repair backs up the current working EFI installation first. Raw SMBIOS remains disabled. The compact panel uses `cpu`, `ram`, `bios`, `uefi`, `secure`, `gpu`, and `disk` labels; RAM is shown in binary gigabytes (GB). If firmware stalls, boot Ubuntu from the firmware menu and run the repair without options to return to compatibility mode. `--safe` also disables the entire overlay. Firmware controller calls still require a physical boot test; NVMe Identify requests have a one-second timeout, which buggy firmware may ignore.
+
+Disk display lists each available whole device on its own `disk1`, `disk2`, … row, including model, capacity, and connection type. Partitions and absent media are excluded. Enumeration follows firmware order; numbering may change with attached devices. Rows stop at the screen boundary with space reserved for the boot prompt.
+
+### Full hardware information trial
+
+After GPU/disk probing is stable, `sudo bash furry-project/scripts/repair-ubuntu.sh --full` enables SMBIOS as well. RAM then shows installed capacity, DDR type, populated/total DIMM slots and reported speed when available; if capacity is unavailable it falls back to the EFI memory map. CPU names retain CPUID with an SMBIOS fallback. This enables all currently implemented dynamic information options; firmware auto scaling stays on. Backups and the permanent Ubuntu boot order are preserved. To turn off only SMBIOS, rerun with `--devices`; to disable controller probes too, run without options; `--safe` disables the full panel.
+
+### Device model decoding
+
+GPU devices now use separate `gpu1`, `gpu2`, … rows. `theme/gpu-names.txt` accepts `vendor:device|name` and more specific `vendor:device:subvendor:subdevice|name` entries; subsystem matches take priority (RTX 2000 Ada and 2000E Ada share a device ID). Unknown GPUs show their PCI IDs. NVMe model text comes from Identify Controller, not DiskInfo namespace data. USB mass-storage models use DiskInfo Inquiry; a bridge may report its own product name or expose no model at all. Non-ASCII/binary model fields are rejected instead of rendered as question marks. `test-ui.sh` also tests these production decoders with protocol fixtures.
+
+USB model diagnostics are recorded as `Disk probe:` lines: whole-device index/transport/capacity, DiskInfo lookup status and interface GUID, Identify/Inquiry availability, command status, returned length and model acceptance. A bounded hex dump contains only the model field. After a test boot, `sudo bash furry-project/scripts/read-device-log.sh` extracts these lines. No additional device commands are issued for logging.
+
+Some USB firmware returns a short Inquiry payload (11 bytes observed on the RTL9210 bridge). Diagnostics log this payload. If the entire bounded payload is printable text with an alphanumeric name, it is shown with `[USB label]` to distinguish a firmware label from a standard drive model. Binary/truncated SCSI data remains rejected.
+
+When USB DiskInfo cannot supply a model, the read-only USB IO fallback matches the nearest ancestor device path, gets its device/product descriptors and displays the result with `[box]`. This identifies the enclosure, not the enclosed drive. If the string is unavailable, the fallback displays the enclosure VID:PID. USB descriptor calls have separate diagnostic log entries; no reset or bulk storage commands are used.
+
+### Validated physical-machine settings
+
+The October 11–12 Ubuntu test confirmed normal refresh/boot, working About, SMBIOS RAM, RTX 2000 Ada plus AMD graphics, individual NVMe/SATA disk models, and USB enclosure descriptor fallback. All dynamic information switches are enabled on that machine (`repair-ubuntu.sh --full`). The menu uses `timeout 5` and `default_selection "Windows,Microsoft"`: Windows is preferred; without a matching Windows entry, the first entry in the displayed boot order is selected. Press a key to cancel automatic boot. This does not claim a completed physical Windows boot, Secure Boot-off test, or validation across other monitors.

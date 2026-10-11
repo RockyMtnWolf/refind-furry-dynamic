@@ -96,67 +96,32 @@ static UINTN   egScreenHeight = 600;
 // On GOP systems, set the maximum available resolution.
 // On UGA systems, just record the current resolution.
 VOID egSetMaxResolution(VOID) {
-    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *Info;
+    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *Info = NULL;
+    EFI_STATUS Status;
+    UINTN BestMode, Zero = 0, SizeOfInfo;
+    UINT64 BestArea;
+    UINT32 Mode;
 
-    EFI_STATUS   Status   = EFI_UNSUPPORTED;
-    UINTN        Zero     = 0;
-    UINT32       Width    = 0;
-    UINT32       Height   = 0;
-    UINT32       BestMode = 0;
-    UINT32       Mode;
-    UINT32       UGAWidth, UGAHeight, UGADepth, UGARefreshRate;
-    UINTN        SizeOfInfo;
-    BOOLEAN      Result;
-
-    if (GraphicsOutput == NULL) {
-        // Can't do this in UGA or text mode, so get and set basic data and then
-        // quietly ignore....
-        Status = refit_call5_wrapper(UgaDraw->GetMode,
-                                     UgaDraw,
-                                     &UGAWidth,
-                                     &UGAHeight,
-                                     &UGADepth,
-                                     &UGARefreshRate);
-        egScreenWidth = GlobalConfig.RequestedScreenWidth = UGAWidth;
-        egScreenHeight = GlobalConfig.RequestedScreenHeight = UGAHeight;
-        return;
-    }
-
+    if (!GraphicsOutput || !GraphicsOutput->Mode || !GraphicsOutput->Mode->Info)
+        return; // Keep the current UGA/text mode.
+    BestMode = GraphicsOutput->Mode->Mode;
+    BestArea = (UINT64)GraphicsOutput->Mode->Info->HorizontalResolution *
+               GraphicsOutput->Mode->Info->VerticalResolution;
     for (Mode = 0; Mode < GraphicsOutput->Mode->MaxMode; Mode++) {
-        Status = refit_call4_wrapper(GraphicsOutput->QueryMode,
-                                     GraphicsOutput,
-                                     Mode,
-                                     &SizeOfInfo,
-                                     &Info);
-        if (!EFI_ERROR(Status)) {
-            if ((Width < Info->HorizontalResolution) && (Height < Info->VerticalResolution)) {
-                Width = Info->HorizontalResolution;
-                Height = Info->VerticalResolution;
-                BestMode = Mode;
-            }
-        } // if()
-    } // for()
-
-    // Check if requested mode is equal to current mode; if so, record the
-    // fact and move on....
-    if (BestMode == GraphicsOutput->Mode->Mode) {
-        egScreenWidth = GlobalConfig.RequestedScreenWidth = GraphicsOutput->Mode->Info->HorizontalResolution;
-        egScreenHeight = GlobalConfig.RequestedScreenHeight = GraphicsOutput->Mode->Info->VerticalResolution;
-        Status = EFI_SUCCESS;
-    } else { // Need to set the new mode....
-        Result = egSetScreenSize((UINTN*) &BestMode, &Zero);
-        if (Result) {
-            egScreenWidth = GlobalConfig.RequestedScreenWidth = Width;
-            egScreenHeight = GlobalConfig.RequestedScreenHeight = Height;
-        } else {
-            // we can not set BestMode, so use the current mode
-            BestMode = GraphicsOutput->Mode->Mode;
-            Zero = 0;
-            Result = egSetScreenSize((UINTN*) &BestMode, &Zero);
-        } // if/else
-    } // if/else
-
-    return;
+        Info = NULL;
+        Status = refit_call4_wrapper(GraphicsOutput->QueryMode, GraphicsOutput,
+                                     Mode, &SizeOfInfo, &Info);
+        if (!EFI_ERROR(Status) && Info && SizeOfInfo >= sizeof(*Info)) {
+            UINT64 Area = (UINT64)Info->HorizontalResolution * Info->VerticalResolution;
+            if (Area > BestArea) { BestArea = Area; BestMode = Mode; }
+        }
+        if (Info) FreePool(Info);
+    }
+    // egSetScreenSize writes UINTN values: never cast a UINT32 stack address.
+    if (BestMode != GraphicsOutput->Mode->Mode)
+        egSetScreenSize(&BestMode, &Zero);
+    egScreenWidth = GlobalConfig.RequestedScreenWidth = GraphicsOutput->Mode->Info->HorizontalResolution;
+    egScreenHeight = GlobalConfig.RequestedScreenHeight = GraphicsOutput->Mode->Info->VerticalResolution;
 } // VOID egSetMaxResolution()
 
 // Make the necessary system calls to identify the current graphics mode.

@@ -99,17 +99,22 @@ VOID egRenderText(IN CHAR16 *Text, IN OUT EG_IMAGE *CompImage, IN UINTN PosX, IN
     EG_PIXEL        *FontPixelData;
     UINTN           BufferLineOffset, FontLineOffset;
     UINTN           TextLength;
-    UINTN           i, c;
+    UINTN           i, c, DrawHeight;
 
     egPrepareFont();
 
+    // Reject off-image origins before subtracting unsigned coordinates.
+    if (!CompImage || !CompImage->PixelData || !BaseFontImage || !FontCellWidth ||
+        PosX >= CompImage->Width || PosY >= CompImage->Height) return;
+    DrawHeight = BaseFontImage->Height;
+    if (DrawHeight > CompImage->Height - PosY) DrawHeight = CompImage->Height - PosY;
     // clip the text
     if (Text)
        TextLength = StrLen(Text);
     else
        TextLength = 0;
 
-    if (TextLength * FontCellWidth + PosX > CompImage->Width)
+    if (TextLength > (CompImage->Width - PosX) / FontCellWidth)
         TextLength = (CompImage->Width - PosX) / FontCellWidth;
 
     if (BGBrightness < 128) {
@@ -145,7 +150,7 @@ VOID egRenderText(IN CHAR16 *Text, IN OUT EG_IMAGE *CompImage, IN UINTN PosX, IN
         else
             c -= 32;
         egRawCompose(BufferPtr, FontPixelData + c * FontCellWidth,
-                     FontCellWidth, FontImage->Height,
+                     FontCellWidth, DrawHeight,
                      BufferLineOffset, FontLineOffset);
         BufferPtr += FontCellWidth;
     }

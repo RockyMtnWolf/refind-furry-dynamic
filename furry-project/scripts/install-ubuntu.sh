@@ -86,7 +86,9 @@ if ((SECURE)); then
  fi
  [[ -f "$KEY" && -f "$CERT" ]] || die '签名密钥不完整；请检查 /var/lib/refind-furry/keys。'
  openssl x509 -in "$CERT" -outform DER -out "$DER"
- if ! mokutil --test-key "$DER" >/dev/null 2>&1; then
+ # Do not infer enrollment solely from mokutil exit status.
+ source "$ROOT/scripts/check-mok.sh"
+ if ! mok_key_enrolled "$DER"; then
   echo 'Secure Boot 已开启。需要先注册本机专用 MOK，原启动顺序保持不变。'
   openssl x509 -in "$CERT" -noout -fingerprint -sha256
   echo '请设置临时注册密码；重启进入 Ubuntu shim 的 Enroll MOK → Continue → Yes，输入此密码。'
@@ -128,7 +130,7 @@ timeout 5
 default_selection "Windows,Microsoft"
 scanfor internal,external,optical,manual
 scan_all_linux_kernels false
-dont_scan_dirs +,EFI/refind-furry
+dont_scan_dirs +,EFI/refind-furry,EFI/BOOT
 dont_scan_files +,mmx64.efi,MokManager.efi
 showtools reboot,shutdown,about,firmware
 hideui hints,arrows,badges
@@ -136,6 +138,8 @@ use_nvram false
 include themes/finn-term/theme.conf
 CONF
 if [[ -n "$ESP" && -f "$ESP/EFI/ubuntu/shimx64.efi" ]]; then
+ # Keep one explicit shim entry; avoid auto-scanning Ubuntu GRUB/shim duplicates.
+ sed -i 's/^dont_scan_dirs .*/&,EFI\/ubuntu/' "$PAYLOAD/refind.conf"
  cat >>"$PAYLOAD/refind.conf" <<'CONF'
 menuentry "Ubuntu" {
     loader /EFI/ubuntu/shimx64.efi
@@ -144,6 +148,7 @@ menuentry "Ubuntu" {
 CONF
 fi
 if [[ -n "$ESP" && -f "$ESP/EFI/Microsoft/Boot/bootmgfw.efi" ]]; then
+ sed -i 's/^dont_scan_dirs .*/&,EFI\/Microsoft\/Boot/' "$PAYLOAD/refind.conf"
  cat >>"$PAYLOAD/refind.conf" <<'CONF'
 menuentry "Windows" {
     loader /EFI/Microsoft/Boot/bootmgfw.efi
