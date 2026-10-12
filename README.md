@@ -7,7 +7,7 @@
 ![Build](https://img.shields.io/badge/Build-GNU--EFI_%7C_GCC-orange?style=for-the-badge)
 ![QEMU](https://img.shields.io/badge/QEMU_%2B_OVMF-Tests_Passed-2EA44F?style=for-the-badge)
 ![VMware](https://img.shields.io/badge/VMware-Menu_Test_Passed-2EA44F?style=for-the-badge)
-![Hardware](https://img.shields.io/badge/Physical_Hardware-Ubuntu_passed-brightgreen?style=for-the-badge)
+![Hardware](https://img.shields.io/badge/Physical_Hardware-Ubuntu_%26_Windows_passed-brightgreen?style=for-the-badge)
 
 **A customized rEFInd boot manager with live UEFI hardware information, a purple terminal interface, and a 3840 × 2160 furry background.**
 
@@ -72,7 +72,7 @@ Set `dynamic_info true` in the theme configuration to enable the overlay. Set it
 
 ## 🧪 Validation Status
 
-**VM validation and the current Ubuntu physical-machine validation have passed.** VM tests were recorded on October 6–7, 2026; physical tests on October 11–12, 2026. Physical Windows desktop boot and other machines remain untested.
+**All currently planned validation is complete, including Ubuntu and Windows physical-machine boot.** VM tests were recorded on October 6–7, 2026; Ubuntu physical tests on October 11–12, 2026. The user confirmed the final Windows physical-machine test passed on October 12, 2026.
 
 | Test | Status | Evidence / scope |
 | :--- | :---: | :--- |
@@ -87,9 +87,9 @@ Set `dynamic_info true` in the theme configuration to enable the overlay. Set it
 | Windows default + five-second timeout | ✅ Passed | VMware captures of selected Windows demo entry, countdown, automatic launch |
 | Ubuntu installer package regression | ✅ Passed | Repeated staging, exact files/configuration, invalid EFI rejection |
 | Physical hardware / real Ubuntu installation | ✅ Passed | Secure Boot/MOK, signed updates, 4K GOP, normal redraw/About and Ubuntu boot; CPU/SMBIOS, both GPUs, NVMe/SATA and USB box display |
-| Physical Windows test | ⏳ TODO | Separate system disk/ESP discovery, five-second Windows-first auto boot and full desktop boot with Secure Boot enabled |
+| Physical Windows test | ✅ Passed | User-confirmed completion of the final Windows physical-machine boot test on October 12, 2026 |
 
-WinPE validation does not imply a completed Windows installation or Windows desktop test. The lab enrolls its own certificate only into isolated OVMF variables; those keys are not production keys.
+The VM Windows evidence covers WinPE; the separate physical Windows boot result was confirmed by the user. The lab enrolls its own certificate only into isolated OVMF variables; those keys are not production keys.
 
 Detailed records: [Phase 1](furry-project/evidence/VERIFICATION.md), [Phase 2](furry-project/evidence/phase2/VERIFICATION.md), [Physical-machine checklist](furry-project/HARDWARE-TEST.md). The existing detailed lab records are in Chinese; this README provides the English status and reproduction entry points.
 
@@ -283,7 +283,7 @@ furry-project/
   scripts/                    Build, installer, VM setup, capture, regression tests
   evidence/                   Actual VM captures and validation records
   refind.conf                 Demo menu with Windows default and five-second timeout
-  TODO.md                     Completed work and remaining validation
+  TODO.md                     Completed validation checklist
   HARDWARE-TEST.md             Physical-machine validation checklist
 README.txt, BUILDING.txt       Preserved upstream documentation
 ```
@@ -300,7 +300,9 @@ Generated ESPs, VM disks, firmware variables, and private signing keys are exclu
 - [x] Ubuntu installer and repeatable installation-package tests.
 - [x] Current physical machine: 4K firmware graphics, GPU/NVMe/SATA/USB, SMBIOS and Ubuntu boot.
 - [x] Real Ubuntu installation, MOK enrollment, signed updates, backup and preserved Ubuntu recovery entry.
-- [ ] Windows physical-machine test: system disk discovery, five-second Windows-first auto boot and full desktop boot with Secure Boot enabled.
+- [x] Windows physical-machine boot test (user-confirmed, October 12, 2026).
+
+All TODO items within the current project scope are complete.
 
 See [TODO.md](furry-project/TODO.md) for the complete checklist and [CHANGES.md](furry-project/CHANGES.md) for implementation notes.
 
@@ -336,4 +338,4 @@ When USB DiskInfo cannot supply a model, the read-only USB IO fallback matches t
 
 ### Validated physical-machine settings
 
-The October 11–12 Ubuntu test confirmed normal refresh/boot, working About, SMBIOS RAM, RTX 2000 Ada plus AMD graphics, individual NVMe/SATA disk models, and USB enclosure descriptor fallback. All dynamic information switches are enabled on that machine (`repair-ubuntu.sh --full`). The menu uses `timeout 5` and `default_selection "Windows,Microsoft"`: Windows is preferred; without a matching Windows entry, the first entry in the displayed boot order is selected. Press a key to cancel automatic boot. This does not claim a completed physical Windows boot, Secure Boot-off test, or validation across other monitors.
+The October 11–12 Ubuntu test confirmed normal refresh/boot, working About, SMBIOS RAM, RTX 2000 Ada plus AMD graphics, individual NVMe/SATA disk models, and USB enclosure descriptor fallback. All dynamic information switches are enabled on that machine (`repair-ubuntu.sh --full`). The menu uses `timeout 5` and `default_selection "Windows,Microsoft"`: Windows is preferred; without a matching Windows entry, the first entry in the displayed boot order is selected. Press a key to cancel automatic boot. The user subsequently confirmed the Windows physical-machine boot test passed on October 12. All currently planned TODO items are complete. Secure Boot-off behavior and other monitors remain outside the validated scope.

@@ -24,11 +24,11 @@
 - [x] Signed updates with the existing key, EFI/BootOrder backups, original Ubuntu/fallback files preserved and recovery entry available.
 - [x] Repeated Ubuntu boot, normal menu refresh and working About submenu on current firmware.
 
-## Remaining Validation — Windows Physical Machine
+## Final Windows Physical-Machine Validation — Completed
 
-- [ ] Discover the Windows system disk and its EFI System Partition, select Windows by default, and reach the full Windows desktop after the five-second countdown with Secure Boot enabled.
+- [x] Final Windows physical-machine boot test: user confirmed success on 2026-10-12 after applying the five-second Windows-first configuration.
 
-Use [HARDWARE-TEST.md](HARDWARE-TEST.md) for the physical-machine procedure. This is the only remaining planned validation task. VMware Ubuntu MOK / full dual-disk boot and Hyper-V are outside the current validation scope. Other firmware/monitors, Secure Boot-off behavior and an actual backup restoration are not claimed as tested and are not remaining TODO items.
+Use [HARDWARE-TEST.md](HARDWARE-TEST.md) for the physical-machine procedure. All TODO items in the current project scope are complete. The final Windows result is based on user confirmation; no new Windows screenshot or diagnostic capture is included. VMware Ubuntu MOK / full dual-disk boot and Hyper-V are outside the current validation scope. Other firmware/monitors, Secure Boot-off behavior and an actual backup restoration are not claimed as tested and are not remaining TODO items.
 
 ## Publication
 
